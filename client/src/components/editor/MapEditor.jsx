@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { MapEditorScene, DEFAULT_GROUND_COLOR, DEFAULT_MAP_SIZE } from '../../map/MapEditorScene.js';
+import { MapEditorScene, DEFAULT_MAP_SIZE } from '../../map/MapEditorScene.js';
+import { SKY_OPTIONS, WEATHER_OPTIONS, DEFAULT_SKY, DEFAULT_WEATHER } from '../../map/environment.js';
 import {
   getAnimationNames,
   getCategories,
@@ -76,7 +77,8 @@ export function MapEditor({ mapId, onExit }) {
   const [savedId, setSavedId] = useState(mapId);
   const [name, setName] = useState('');
   const [size, setSize] = useState(DEFAULT_MAP_SIZE);
-  const [groundColor, setGroundColor] = useState(DEFAULT_GROUND_COLOR);
+  const [sky, setSky] = useState(DEFAULT_SKY);
+  const [weather, setWeather] = useState(DEFAULT_WEATHER);
   const [objects, setObjects] = useState([]);
   const [selectedUid, setSelectedUid] = useState(null);
   const [placingType, setPlacingType] = useState(null);
@@ -117,7 +119,8 @@ export function MapEditor({ mapId, onExit }) {
         .then((map) => {
           setName(map.name);
           setSize(map.size);
-          setGroundColor(map.groundColor);
+          setSky(map.sky || DEFAULT_SKY);
+          setWeather(map.weather || DEFAULT_WEATHER);
           scene.loadMap(map);
         })
         .catch((e) => setStatus({ type: 'error', text: e.message }))
@@ -160,10 +163,16 @@ export function MapEditor({ mapId, onExit }) {
     scene().setSnap(value);
   };
 
-  const changeGround = (color, newSize) => {
-    setGroundColor(color);
+  const changeSize = (newSize) => {
     setSize(newSize);
-    scene().setGround(color, newSize);
+    scene().setGroundSize(newSize);
+    setDirty(true);
+  };
+
+  const changeEnvironment = (newSky, newWeather) => {
+    setSky(newSky);
+    setWeather(newWeather);
+    scene().setEnvironment(newSky, newWeather);
     setDirty(true);
   };
 
@@ -171,7 +180,8 @@ export function MapEditor({ mapId, onExit }) {
     const payload = {
       name: name.trim() || t('editor.untitled'),
       size,
-      groundColor,
+      sky,
+      weather,
       objects: scene().getObjects()
     };
     try {
@@ -214,7 +224,7 @@ export function MapEditor({ mapId, onExit }) {
     scene().select(null);
     scene().setPlacingType(null);
     scene().setPaused(true);
-    setPreviewMap({ size, groundColor, objects: scene().getObjects() });
+    setPreviewMap({ size, sky, weather, objects: scene().getObjects() });
   };
 
   const stopPreview = () => {
@@ -306,14 +316,26 @@ export function MapEditor({ mapId, onExit }) {
 
           <h3>{t('editor.ground')}</h3>
           <label className="ed-field">
-            <span>{t('editor.groundColor')}</span>
-            <input type="color" value={groundColor} onChange={(e) => changeGround(e.target.value, size)} />
-          </label>
-          <label className="ed-field">
             <span>{t('editor.mapSize')}</span>
-            <select value={size} onChange={(e) => changeGround(groundColor, Number(e.target.value))}>
+            <select value={size} onChange={(e) => changeSize(Number(e.target.value))}>
               {SIZE_OPTIONS.map((s) => (
                 <option key={s} value={s}>{s} × {s}</option>
+              ))}
+            </select>
+          </label>
+          <label className="ed-field">
+            <span>{t('editor.sky')}</span>
+            <select value={sky} onChange={(e) => changeEnvironment(e.target.value, weather)}>
+              {SKY_OPTIONS.map((s) => (
+                <option key={s} value={s}>{t('editor.sky.' + s)}</option>
+              ))}
+            </select>
+          </label>
+          <label className="ed-field">
+            <span>{t('editor.weather')}</span>
+            <select value={weather} onChange={(e) => changeEnvironment(sky, e.target.value)}>
+              {WEATHER_OPTIONS.map((w) => (
+                <option key={w} value={w}>{t('editor.weather.' + w)}</option>
               ))}
             </select>
           </label>

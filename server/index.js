@@ -4,7 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import { generateRoomCode } from '../shared/utils.js';
 import GameManager from './managers/GameManager.js';
-import mapStore from './managers/MapStore.js';
+import mapStore, { sanitizeEnvironment } from './managers/MapStore.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -107,7 +107,7 @@ io.on('connection', (socket) => {
         }
       }
 
-      const room = gameManager.createRoom(roomCode, socket.id, data.playerName, map);
+      const room = gameManager.createRoom(roomCode, socket.id, data.playerName, map, sanitizeEnvironment(data.environment, map || {}));
         
       if (room) {
         socket.join(roomCode);

@@ -3,7 +3,8 @@
   "name": "aritest",
   "version": 1,
   "size": 500,
-  "groundColor": "#1a3a1a",
+  "sky": "bright",
+  "weather": "clear",
   "createdAt": "2026-10-05T04:56:17.595Z",
   "updatedAt": "2026-10-05T06:06:07.191Z",
   "objects": [

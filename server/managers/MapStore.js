@@ -7,12 +7,22 @@ const MAPS_DIR = path.join(__dirname, '..', 'data', 'maps');
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 const MAX_OBJECTS = 5000;
+const SKIES = ['darkFantasy', 'bright'];
+const WEATHERS = ['clear', 'rain'];
 
 const num = (value, fallback = 0) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
 const str = (value, max = 120) => String(value ?? '').slice(0, max);
 
 export function isValidMapId(id) {
   return typeof id === 'string' && ID_PATTERN.test(id);
+}
+
+// Picks a valid sky/weather pair, falling back to the given defaults for unknown values.
+export function sanitizeEnvironment(input, fallback = {}) {
+  return {
+    sky: SKIES.includes(input?.sky) ? input.sky : fallback.sky || 'bright',
+    weather: WEATHERS.includes(input?.weather) ? input.weather : fallback.weather || 'clear'
+  };
 }
 
 export function slugify(name) {
@@ -34,7 +44,7 @@ export function sanitizeMap(input, id, previous = null) {
     name: str(input?.name, 60).trim() || 'Untitled Map',
     version: 1,
     size: Math.min(Math.max(num(input?.size, 500), 50), 2000),
-    groundColor: /^#[0-9a-fA-F]{6}$/.test(input?.groundColor) ? input.groundColor : '#1a3a1a',
+    ...sanitizeEnvironment(input),
     createdAt: previous?.createdAt || now,
     updatedAt: now,
     objects: rawObjects.map((o, index) => ({
@@ -68,6 +78,7 @@ class MapStore {
           id: map.id,
           name: map.name,
           size: map.size,
+          ...sanitizeEnvironment(map),
           objectCount: Array.isArray(map.objects) ? map.objects.length : 0,
           createdAt: map.createdAt,
           updatedAt: map.updatedAt

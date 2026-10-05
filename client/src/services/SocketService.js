@@ -73,12 +73,12 @@ class SocketService {
   }
 
   // Room Management
-  createRoom(playerName, mapId, callback) {
+  createRoom(playerName, mapId, environment, callback) {
     if (!this.socket) {
       console.error('Socket not connected');
       return;
     }
-    this.socket.emit('createRoom', { playerName, mapId }, (response) => {
+    this.socket.emit('createRoom', { playerName, mapId, environment }, (response) => {
       if (callback) callback(response);
     });
   }

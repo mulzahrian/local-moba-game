@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import characterModelUrl from '../model/rimuru_tempest.glb?url';
 import { MapObject } from '../map/mapAssets.js';
+import { Environment, createGroundGeometry, createGroundMaterial } from '../map/environment.js';
 
 const ANIM_IDLE = 'lml_anim_idle';
 const ANIM_RUN = 'lml_anim_run';
@@ -138,9 +139,10 @@ export class GameScene {
     this.scene.add(directionalLight);
     this.scene.add(directionalLight.target);
     this.sunLight = directionalLight;
+    this.environment = new Environment(this.scene, { ambientLight, sunLight: directionalLight });
   }
 
-  setupBoard(size = DEFAULT_ARENA_SIZE, groundColor = 0x1a3a1a) {
+  setupBoard(size = DEFAULT_ARENA_SIZE) {
     if (this.boardGroup) {
       this.scene.remove(this.boardGroup);
       this.boardGroup.traverse((child) => {
@@ -155,17 +157,12 @@ export class GameScene {
     this.arenaLimit = half - 10;
 
     // Game board - DOTA-style large map (500x500 units by default)
-    const boardGeometry = new THREE.PlaneGeometry(size, size);
-    const boardMaterial = new THREE.MeshLambertMaterial({ color: groundColor });
+    const boardGeometry = createGroundGeometry(size);
+    const boardMaterial = createGroundMaterial();
     const board = new THREE.Mesh(boardGeometry, boardMaterial);
     board.receiveShadow = true;
     board.rotation.x = -Math.PI / 2;
     this.boardGroup.add(board);
-
-    // Large grid helper - like Dota map
-    const gridHelper = new THREE.GridHelper(size, Math.max(1, Math.round(size / 10)), 0x447744, 0x223322);
-    gridHelper.position.y = 0.1;
-    this.boardGroup.add(gridHelper);
 
     // Radiant base (bottom-left, green)
     const baseOffset = size * 0.4;
@@ -186,12 +183,18 @@ export class GameScene {
     this.clearMapObjects();
     if (!map) return;
 
-    this.setupBoard(map.size || DEFAULT_ARENA_SIZE, new THREE.Color(map.groundColor || '#1a3a1a'));
+    this.setupBoard(map.size || DEFAULT_ARENA_SIZE);
+    this.environment.apply(map.sky, map.weather);
     (map.objects || []).forEach((data) => {
       const object = new MapObject(data);
       this.scene.add(object.root);
       this.mapObjects.push(object);
     });
+  }
+
+  // Overrides the sky/weather chosen for the room (null keeps the current one).
+  setEnvironment(environment) {
+    if (environment) this.environment.apply(environment.sky, environment.weather);
   }
 
   clearMapObjects() {
@@ -560,11 +563,13 @@ export class GameScene {
     }
 
     this.updateCamera(delta);
+    this.environment.update(delta, this.cameraFocus);
     this.renderer.render(this.scene, this.camera);
   };
 
   dispose() {
     cancelAnimationFrame(this.frameId);
+    this.environment.dispose();
     this.container.removeEventListener('click', this.onClick);
     this.container.removeEventListener('mousemove', this.onMove);
     window.removeEventListener('resize', this.onResize);

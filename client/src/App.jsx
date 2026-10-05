@@ -17,6 +17,8 @@ function App() {
   const musicOn = useSettingsStore((state) => state.musicOn);
   const currentMap = useGameStore((state) => state.currentMap);
   const setCurrentMap = useGameStore((state) => state.setCurrentMap);
+  const currentEnvironment = useGameStore((state) => state.currentEnvironment);
+  const setCurrentEnvironment = useGameStore((state) => state.setCurrentEnvironment);
   const gameState = useGameStore((state) => state.gameState);
   const roomCode = useGameStore((state) => state.roomCode);
   const players = useGameStore((state) => state.players);
@@ -112,6 +114,7 @@ function App() {
       // CRITICAL FIX: Pass socketService and roomCode to scene so movement events get emitted properly
       gameSceneRef.current.setSocketService(socketService, roomCode);
       gameSceneRef.current.loadMap(currentMap);
+      gameSceneRef.current.setEnvironment(currentEnvironment);
     }
     if (gameState !== 'in_game' && gameSceneRef.current) {
       gameSceneRef.current.dispose();
@@ -133,12 +136,13 @@ function App() {
   }, [players, gameState]);
 
   // Handle create room
-  const handleCreateRoom = (playerName, mapId) => {
-    socketService.createRoom(playerName, mapId, (response) => {
+  const handleCreateRoom = (playerName, mapId, environment) => {
+    socketService.createRoom(playerName, mapId, environment, (response) => {
       if (response.success) {
         console.log('Room created:', response.roomCode);
         setRoomCode(response.roomCode);
         setCurrentMap(response.room.map || null);
+        setCurrentEnvironment(response.room.environment || null);
         setCurrentPlayer({
           id: socketService.socket.id,
           name: playerName
@@ -159,6 +163,7 @@ function App() {
       if (response.success) {
         setRoomCode(response.room.code);
         setCurrentMap(response.room.map || null);
+        setCurrentEnvironment(response.room.environment || null);
         setCurrentPlayer({
           id: socketService.socket.id,
           name: playerName

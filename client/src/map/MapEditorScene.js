@@ -1,13 +1,13 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { MapObject, createUid } from './mapAssets.js';
+import { Environment, createGroundGeometry, createGroundMaterial } from './environment.js';
 
 const GROUND_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const PAN_SPEED = 160;
 const CAMERA_ROTATE_SPEED = 90; // degrees per second for Q / E
 
 export const DEFAULT_MAP_SIZE = 500;
-export const DEFAULT_GROUND_COLOR = '#1a3a1a';
 
 const clone = (data) => ({ ...data, position: { ...data.position } });
 
@@ -37,7 +37,6 @@ export class MapEditorScene {
     this.clock = new THREE.Clock();
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0a0d12);
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.5, 4000);
     this.camera.position.set(0, 220, 260);
 
@@ -54,7 +53,13 @@ export class MapEditorScene {
     this.controls.target.set(0, 0, 0);
 
     this.setupLights();
-    this.setupGround(DEFAULT_MAP_SIZE, DEFAULT_GROUND_COLOR);
+    this.setupGround(DEFAULT_MAP_SIZE);
+    this.environment = new Environment(this.scene, {
+      ambientLight: this.ambientLight,
+      sunLight: this.sunLight,
+      fogScale: 0.15,
+      rainArea: 300
+    });
 
     this.selectionBox = new THREE.Box3Helper(new THREE.Box3(), 0xffd34d);
     this.selectionBox.visible = false;
@@ -66,8 +71,10 @@ export class MapEditorScene {
   }
 
   setupLights() {
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    this.scene.add(this.ambientLight);
     const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+    this.sunLight = sun;
     sun.position.set(120, 220, 90);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
@@ -75,7 +82,7 @@ export class MapEditorScene {
     this.scene.add(sun);
   }
 
-  setupGround(size, color) {
+  setupGround(size) {
     if (this.ground) {
       this.scene.remove(this.ground);
       this.ground.geometry.dispose();
@@ -86,14 +93,16 @@ export class MapEditorScene {
     }
     this.size = size;
     this.ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(size, size),
-      new THREE.MeshLambertMaterial({ color })
+      createGroundGeometry(size),
+      createGroundMaterial()
     );
     this.ground.rotation.x = -Math.PI / 2;
     this.ground.receiveShadow = true;
     this.scene.add(this.ground);
 
-    this.grid = new THREE.GridHelper(size, Math.max(1, Math.round(size / 10)), 0x5d8f5d, 0x2c452c);
+    this.grid = new THREE.GridHelper(size, Math.max(1, Math.round(size / 10)), 0xffffff, 0xffffff);
+    this.grid.material.transparent = true;
+    this.grid.material.opacity = 0.12;
     this.grid.position.y = 0.1;
     this.scene.add(this.grid);
     this.setupBaseMarkers(size);
@@ -188,7 +197,8 @@ export class MapEditorScene {
 
   loadMap(map) {
     this.clearObjects();
-    this.setupGround(map.size || DEFAULT_MAP_SIZE, map.groundColor || DEFAULT_GROUND_COLOR);
+    this.setupGround(map.size || DEFAULT_MAP_SIZE);
+    this.setEnvironment(map.sky, map.weather);
     (map.objects || []).forEach((data) => this.createEntry(clone(data)));
     this.select(null);
     this.setPlacingType(null);
@@ -199,17 +209,18 @@ export class MapEditorScene {
     return Array.from(this.entries.values()).map((entry) => clone(entry.data));
   }
 
-  setGround(color, size) {
-    if (size !== this.size) {
-      this.setupGround(size, color);
-      this.entries.forEach((entry) => {
-        this.clampToMap(entry.data.position);
-        entry.object.applyTransform(entry.data);
-      });
-      this.emitChange();
-    } else {
-      this.ground.material.color.set(color);
-    }
+  setGroundSize(size) {
+    if (size === this.size) return;
+    this.setupGround(size);
+    this.entries.forEach((entry) => {
+      this.clampToMap(entry.data.position);
+      entry.object.applyTransform(entry.data);
+    });
+    this.emitChange();
+  }
+
+  setEnvironment(sky, weather) {
+    this.environment.apply(sky, weather);
   }
 
   clearObjects() {
@@ -552,11 +563,13 @@ export class MapEditorScene {
     this.entries.forEach((entry) => entry.object.update(delta));
     this.ghost?.update(delta);
     this.updateSelectionBox();
+    this.environment.update(delta, this.controls.target);
     this.renderer.render(this.scene, this.camera);
   };
 
   dispose() {
     this.disposed = true;
+    this.environment.dispose();
     cancelAnimationFrame(this.frameId);
     const el = this.renderer.domElement;
     el.removeEventListener('pointerdown', this.onPointerDown);

@@ -5,6 +5,7 @@ export const useGameStore = create((set) => ({
   roomCode: null,
   players: [],
   currentPlayer: null,
+  currentEnvironment: null, // { sky, weather } for the room (null = default)
   currentMap: null, // map JSON chosen for the room (null = default arena)
   gameState: 'menu', // menu, room_lobby, in_game, finished
 
@@ -17,6 +18,7 @@ export const useGameStore = create((set) => ({
   setPlayers: (players) => set({ players }),
   setCurrentPlayer: (player) => set({ currentPlayer: player }),
   setCurrentMap: (map) => set({ currentMap: map }),
+  setCurrentEnvironment: (environment) => set({ currentEnvironment: environment }),
   setGameState: (state) => set({ gameState: state }),
   addMessage: (message) => set((state) => ({
     messages: [...state.messages, message]
@@ -30,6 +32,7 @@ export const useGameStore = create((set) => ({
     players: [],
     currentPlayer: null,
     currentMap: null,
+    currentEnvironment: null,
     gameState: 'menu',
     messages: [],
     selectedTarget: null
