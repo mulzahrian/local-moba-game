@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import { generateRoomCode } from '../shared/utils.js';
 import GameManager from './managers/GameManager.js';
+import mapStore from './managers/MapStore.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -19,7 +20,7 @@ const io = new Server(httpServer, {
 app.use(cors({
   origin: '*' // Allow all origins
 }));
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 
 // Game Manager Instance
 const gameManager = new GameManager(io);
@@ -29,12 +30,64 @@ app.get('/health', (req, res) => {
   res.json({ status: 'Server is running' });
 });
 
+// Map API (maps are stored as JSON files in server/data/maps)
+const handleMapError = (res, error) => {
+  console.error('[MapAPI] Error:', error);
+  res.status(500).json({ success: false, message: 'Server error' });
+};
+
+app.get('/api/maps', async (req, res) => {
+  try {
+    res.json({ success: true, maps: await mapStore.list() });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.get('/api/maps/:id', async (req, res) => {
+  try {
+    const map = await mapStore.get(req.params.id);
+    if (!map) return res.status(404).json({ success: false, message: 'Map not found' });
+    res.json({ success: true, map });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.post('/api/maps', async (req, res) => {
+  try {
+    res.status(201).json({ success: true, map: await mapStore.create(req.body) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.put('/api/maps/:id', async (req, res) => {
+  try {
+    const map = await mapStore.update(req.params.id, req.body);
+    if (!map) return res.status(404).json({ success: false, message: 'Map not found' });
+    res.json({ success: true, map });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.delete('/api/maps/:id', async (req, res) => {
+  try {
+    const removed = await mapStore.remove(req.params.id);
+    if (!removed) return res.status(404).json({ success: false, message: 'Map not found' });
+    res.json({ success: true });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
 // Socket.IO Events
 io.on('connection', (socket) => {
   console.log(`[${new Date().toLocaleTimeString()}] Player connected: ${socket.id}`);
 
   // Room Management
-  socket.on('createRoom', (data, ack) => {
+  socket.on('createRoom', async (data, ack) => {
     try {
       const roomCode = generateRoomCode();
       console.log(`\n[CreateRoom] ========== CREATE ROOM REQUEST ==========`);
@@ -43,7 +96,18 @@ io.on('connection', (socket) => {
       console.log(`[CreateRoom] Generated Room Code: "${roomCode}"`);
       console.log(`[CreateRoom] Callback function present: ${typeof ack === 'function'}`);
         
-      const room = gameManager.createRoom(roomCode, socket.id, data.playerName);
+      let map = null;
+      if (data.mapId) {
+        map = await mapStore.get(data.mapId);
+        if (!map) {
+          if (typeof ack === 'function') {
+            ack({ success: false, message: 'Map not found' });
+          }
+          return;
+        }
+      }
+
+      const room = gameManager.createRoom(roomCode, socket.id, data.playerName, map);
         
       if (room) {
         socket.join(roomCode);

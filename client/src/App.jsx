@@ -5,9 +5,17 @@ import { GameHUD } from './components/GameHUD.jsx';
 import { GameScene } from './scenes/GameScene.js';
 import { useGameStore } from './store/gameStore.js';
 import { socketService } from './services/SocketService.js';
+import { audioService } from './services/audioService.js';
+import { MenuBackdrop } from './components/MenuBackdrop.jsx';
+import { useSettingsStore } from './store/settingsStore.js';
+import { useT } from './i18n/index.js';
 import './styles/App.css';
 
 function App() {
+  const t = useT();
+  const musicOn = useSettingsStore((state) => state.musicOn);
+  const currentMap = useGameStore((state) => state.currentMap);
+  const setCurrentMap = useGameStore((state) => state.setCurrentMap);
   const gameState = useGameStore((state) => state.gameState);
   const roomCode = useGameStore((state) => state.roomCode);
   const players = useGameStore((state) => state.players);
@@ -20,6 +28,15 @@ function App() {
   const setCurrentPlayer = useGameStore((state) => state.setCurrentPlayer);
   const addMessage = useGameStore((state) => state.addMessage);
   const reset = useGameStore((state) => state.reset);
+
+  // Menu music plays on every screen except the match itself.
+  useEffect(() => {
+    audioService.setEnabled(musicOn);
+  }, [musicOn]);
+
+  useEffect(() => {
+    audioService.setWanted(gameState !== 'in_game');
+  }, [gameState]);
 
   const gameContainerRef = useRef(null);
   const gameSceneRef = useRef(null);
@@ -82,6 +99,7 @@ function App() {
       gameSceneRef.current = new GameScene(gameContainerRef.current);
       // CRITICAL FIX: Pass socketService and roomCode to scene so movement events get emitted properly
       gameSceneRef.current.setSocketService(socketService, roomCode);
+      gameSceneRef.current.loadMap(currentMap);
     }
     if (gameState !== 'in_game' && gameSceneRef.current) {
       gameSceneRef.current.dispose();
@@ -103,11 +121,12 @@ function App() {
   }, [players, gameState]);
 
   // Handle create room
-  const handleCreateRoom = (playerName) => {
-    socketService.createRoom(playerName, (response) => {
+  const handleCreateRoom = (playerName, mapId) => {
+    socketService.createRoom(playerName, mapId, (response) => {
       if (response.success) {
         console.log('Room created:', response.roomCode);
         setRoomCode(response.roomCode);
+        setCurrentMap(response.room.map || null);
         setCurrentPlayer({
           id: socketService.socket.id,
           name: playerName
@@ -127,6 +146,7 @@ function App() {
       console.log(`[Client] Join response:`, response);
       if (response.success) {
         setRoomCode(response.room.code);
+        setCurrentMap(response.room.map || null);
         setCurrentPlayer({
           id: socketService.socket.id,
           name: playerName
@@ -136,7 +156,7 @@ function App() {
         setGameState('in_game');
       } else {
         console.error(`[Client] Failed to join room: ${response.message}`);
-        alert(`Failed to join room: ${response.message}`);
+        alert(t('join.failed', { message: response.message }));
       }
     });
   };
@@ -161,25 +181,31 @@ function App() {
       )}
 
       {gameState === 'room_lobby' && (
-        <div className="lobby-container">
-          <div className="lobby-content">
-            <h2>Game Lobby</h2>
-            <p>Room Code: <strong>{roomCode}</strong></p>
-            <p>Players: {players.length}/2</p>
-            <div className="player-list">
+        <MenuBackdrop>
+          <div className="menu-panel lobby-box">
+            <h2 className="panel-title">{t('lobby.title')}</h2>
+            <p className="lobby-meta">{t('lobby.roomCode')}</p>
+            <div className="lobby-code">{roomCode}</div>
+            <p className="lobby-meta">
+              {t('lobby.map')}: {currentMap ? currentMap.name : t('create.defaultMap')}
+            </p>
+            <p className="lobby-meta">{t('lobby.players')}: {players.length}/2</p>
+            <div className="lobby-players">
               {players.map((player) => (
-                <div key={player.id} className="player-info">
+                <div key={player.id} className="lobby-player">
                   <span>{player.name}</span>
                   <span className={`team-badge ${player.team}`}>{player.team}</span>
                 </div>
               ))}
             </div>
-            <p className="waiting-text">Waiting for opponent...</p>
-            <button className="cancel-btn" onClick={handleLeaveRoom}>
-              Cancel
-            </button>
+            <p className="lobby-waiting">{t('lobby.waiting')}</p>
+            <div className="menu-buttons">
+              <button className="fantasy-btn ghost" onClick={handleLeaveRoom}>
+                {t('common.cancel')}
+              </button>
+            </div>
           </div>
-        </div>
+        </MenuBackdrop>
       )}
 
       {gameState === 'in_game' && (

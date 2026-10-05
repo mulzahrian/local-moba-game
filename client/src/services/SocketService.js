@@ -1,18 +1,7 @@
 import { io } from 'socket.io-client';
+import { getServerUrl } from '../config/server.js';
 
-// Dynamically detect server URL based on current host
-const getSocketURL = () => {
-  if (typeof window !== 'undefined') {
-    // Get the current protocol, hostname, and use custom port
-    const protocol = window.location.protocol;
-    const hostname = window.location.hostname;
-    const port = 3001;
-    return `${protocol}//${hostname}:${port}`;
-  }
-  return 'http://localhost:3001';
-};
-
-const SOCKET_URL = getSocketURL();
+const SOCKET_URL = getServerUrl();
 
 class SocketService {
   constructor() {
@@ -84,12 +73,12 @@ class SocketService {
   }
 
   // Room Management
-  createRoom(playerName, callback) {
+  createRoom(playerName, mapId, callback) {
     if (!this.socket) {
       console.error('Socket not connected');
       return;
     }
-    this.socket.emit('createRoom', { playerName }, (response) => {
+    this.socket.emit('createRoom', { playerName, mapId }, (response) => {
       if (callback) callback(response);
     });
   }

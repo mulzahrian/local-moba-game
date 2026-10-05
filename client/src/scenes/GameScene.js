@@ -2,14 +2,16 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import characterModelUrl from '../model/rimuru_tempest.glb?url';
+import { MapObject } from '../map/mapAssets.js';
 
 const ANIM_IDLE = 'lml_anim_idle';
 const ANIM_RUN = 'lml_anim_run';
 const CHARACTER_SCALE = 6;
 const MOVE_SPEED = 45; // units per second
-const ARENA_LIMIT = 240; // keep players inside the arena walls
+const DEFAULT_ARENA_SIZE = 500;
 const NETWORK_SYNC_INTERVAL = 0.05; // seconds between position broadcasts (20Hz)
 const MOVE_EPSILON_SQ = 0.0005; // squared distance threshold to consider a remote player "moving"
+const REMOTE_IDLE_TIMEOUT_MS = 200; // remote player is idle if no movement update arrived within this time
 
 export class GameScene {
   constructor(container) {
@@ -26,6 +28,7 @@ export class GameScene {
     this.setupRenderer();
     this.setupScene();
     this.setupLights();
+    this.mapObjects = [];
     this.setupBoard();
 
     this.players = new Map();
@@ -126,31 +129,63 @@ export class GameScene {
     this.scene.add(directionalLight);
   }
 
-  setupBoard() {
-    // Game board - DOTA-style large map (500x500 units)
-    const boardGeometry = new THREE.PlaneGeometry(500, 500);
-    const boardMaterial = new THREE.MeshLambertMaterial({ color: 0x1a3a1a });
+  setupBoard(size = DEFAULT_ARENA_SIZE, groundColor = 0x1a3a1a) {
+    if (this.boardGroup) {
+      this.scene.remove(this.boardGroup);
+      this.boardGroup.traverse((child) => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) child.material.dispose();
+      });
+    }
+    this.boardGroup = new THREE.Group();
+    this.scene.add(this.boardGroup);
+
+    const half = size / 2;
+    this.arenaLimit = half - 10;
+
+    // Game board - DOTA-style large map (500x500 units by default)
+    const boardGeometry = new THREE.PlaneGeometry(size, size);
+    const boardMaterial = new THREE.MeshLambertMaterial({ color: groundColor });
     const board = new THREE.Mesh(boardGeometry, boardMaterial);
     board.receiveShadow = true;
     board.rotation.x = -Math.PI / 2;
-    this.scene.add(board);
+    this.boardGroup.add(board);
 
     // Large grid helper - like Dota map
-    const gridHelper = new THREE.GridHelper(500, 50, 0x447744, 0x223322);
+    const gridHelper = new THREE.GridHelper(size, Math.max(1, Math.round(size / 10)), 0x447744, 0x223322);
     gridHelper.position.y = 0.1;
-    this.scene.add(gridHelper);
+    this.boardGroup.add(gridHelper);
 
     // Radiant base (bottom-left, green)
-    this.createBaseMarker(-200, 0, -200, 0x92a825, 'Radiant');
-    
+    const baseOffset = size * 0.4;
+    this.createBaseMarker(-baseOffset, 0, -baseOffset, 0x92a825, 'Radiant');
+
     // Dire base (top-right, red)
-    this.createBaseMarker(200, 0, 200, 0x922620, 'Dire');
+    this.createBaseMarker(baseOffset, 0, baseOffset, 0x922620, 'Dire');
 
     // Add some arena walls/boundaries
-    this.createWall(-250, 0, 0, 500, 'vertical');
-    this.createWall(250, 0, 0, 500, 'vertical');
-    this.createWall(0, 0, -250, 500, 'horizontal');
-    this.createWall(0, 0, 250, 500, 'horizontal');
+    this.createWall(-half, 0, 0, size, 'vertical');
+    this.createWall(half, 0, 0, size, 'vertical');
+    this.createWall(0, 0, -half, size, 'horizontal');
+    this.createWall(0, 0, half, size, 'horizontal');
+  }
+
+  // Rebuilds the arena from a saved map (null keeps the default arena) and places its objects.
+  loadMap(map) {
+    this.clearMapObjects();
+    if (!map) return;
+
+    this.setupBoard(map.size || DEFAULT_ARENA_SIZE, new THREE.Color(map.groundColor || '#1a3a1a'));
+    (map.objects || []).forEach((data) => {
+      const object = new MapObject(data);
+      this.scene.add(object.root);
+      this.mapObjects.push(object);
+    });
+  }
+
+  clearMapObjects() {
+    this.mapObjects.forEach((object) => object.dispose());
+    this.mapObjects = [];
   }
 
   createWall(x, y, z, length, orientation) {
@@ -162,7 +197,7 @@ export class GameScene {
     wall.position.set(x, 7.5, z);
     wall.castShadow = true;
     wall.receiveShadow = true;
-    this.scene.add(wall);
+    this.boardGroup.add(wall);
   }
 
   createBaseMarker(x, y, z, color, name) {
@@ -173,7 +208,7 @@ export class GameScene {
     marker.position.set(x, y, z);
     marker.castShadow = true;
     marker.receiveShadow = true;
-    this.scene.add(marker);
+    this.boardGroup.add(marker);
     
     // Base circle on ground
     const baseGeometry = new THREE.CylinderGeometry(30, 30, 1, 32);
@@ -181,9 +216,8 @@ export class GameScene {
     const base = new THREE.Mesh(baseGeometry, baseMaterial);
     base.position.set(x, 0.5, z);
     base.receiveShadow = true;
-    this.scene.add(base);
+    this.boardGroup.add(base);
   }
-
   addPlayer(playerId, playerData, isCurrentPlayer = false) {
     if (this.players.has(playerId)) {
       this.updatePlayer(playerId, playerData);
@@ -283,7 +317,8 @@ export class GameScene {
       currentAction,
       data: playerData,
       isCurrentPlayer,
-      isMoving: false
+      isMoving: false,
+      lastMoveTime: 0
     });
   }
 
@@ -312,6 +347,7 @@ export class GameScene {
     const isMoving = movedDistanceSq > MOVE_EPSILON_SQ;
     if (isMoving) {
       player.model.rotation.y = Math.atan2(dx, dz);
+      player.lastMoveTime = performance.now();
     }
     this.setPlayerMoving(player, isMoving);
   }
@@ -346,6 +382,23 @@ export class GameScene {
     return null;
   }
 
+  // Sends the local player's final position once movement stops, so remote clients
+  // don't end up with a slightly stale position due to throttled syncing.
+  flushLocalPosition(player) {
+    if (this.networkSyncTimer === 0) return;
+    this.networkSyncTimer = 0;
+    this.emitPosition(player.mesh.position.x, player.mesh.position.z);
+  }
+
+  emitPosition(x, z) {
+    if (this.socketService && this.roomCode) {
+      this.socketService.emit('playerMove', {
+        roomCode: this.roomCode,
+        position: { x, z }
+      });
+    }
+  }
+
   // Reads WASD state, moves the local player, rotates it to face its movement
   // direction, drives its run/idle animation, and throttles position sync to the server.
   updateLocalMovement(delta) {
@@ -355,6 +408,7 @@ export class GameScene {
     const { w, a, s, d } = this.keys;
     if (!w && !a && !s && !d) {
       this.setPlayerMoving(player, false);
+      this.flushLocalPosition(player);
       return;
     }
 
@@ -366,13 +420,14 @@ export class GameScene {
 
     if (moveDir.lengthSq() === 0) {
       this.setPlayerMoving(player, false);
+      this.flushLocalPosition(player);
       return;
     }
     moveDir.normalize();
 
     const distance = MOVE_SPEED * delta;
-    const nextX = THREE.MathUtils.clamp(player.mesh.position.x + moveDir.x * distance, -ARENA_LIMIT, ARENA_LIMIT);
-    const nextZ = THREE.MathUtils.clamp(player.mesh.position.z + moveDir.z * distance, -ARENA_LIMIT, ARENA_LIMIT);
+    const nextX = THREE.MathUtils.clamp(player.mesh.position.x + moveDir.x * distance, -this.arenaLimit, this.arenaLimit);
+    const nextZ = THREE.MathUtils.clamp(player.mesh.position.z + moveDir.z * distance, -this.arenaLimit, this.arenaLimit);
 
     player.mesh.position.set(nextX, 0, nextZ);
     player.model.rotation.y = Math.atan2(moveDir.x, moveDir.z);
@@ -381,12 +436,7 @@ export class GameScene {
     this.networkSyncTimer += delta;
     if (this.networkSyncTimer >= NETWORK_SYNC_INTERVAL) {
       this.networkSyncTimer = 0;
-      if (this.socketService && this.roomCode) {
-        this.socketService.emit('playerMove', {
-          roomCode: this.roomCode,
-          position: { x: nextX, z: nextZ }
-        });
-      }
+      this.emitPosition(nextX, nextZ);
     }
   }
 
@@ -465,7 +515,14 @@ export class GameScene {
 
     const delta = this.clock.getDelta();
     this.updateLocalMovement(delta);
+    this.mapObjects.forEach((object) => object.update(delta));
+    const now = performance.now();
     for (const player of this.players.values()) {
+      // Remote players stop sending updates when they stop, so no "idle" event ever arrives;
+      // fall back to idle when no movement update was received recently.
+      if (!player.isCurrentPlayer && player.isMoving && now - player.lastMoveTime > REMOTE_IDLE_TIMEOUT_MS) {
+        this.setPlayerMoving(player, false);
+      }
       player.mixer.update(delta);
     }
 
@@ -478,6 +535,7 @@ export class GameScene {
     window.removeEventListener('resize', this.onWindowResize);
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
+    this.clearMapObjects();
     this.renderer.dispose();
     if (this.container.contains(this.renderer.domElement)) {
       this.container.removeChild(this.renderer.domElement);

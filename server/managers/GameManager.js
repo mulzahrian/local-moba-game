@@ -4,7 +4,7 @@ class GameManager {
     this.rooms = new Map();
   }
 
-  createRoom(roomCode, hostId, hostName) {
+  createRoom(roomCode, hostId, hostName, map = null) {
     console.log(`  [GameManager] Creating room with code: "${roomCode}"`);
     
     if (this.rooms.has(roomCode)) {
@@ -27,6 +27,7 @@ class GameManager {
           experience: 0
         }
       ],
+      map, // full map JSON chosen by the host (null = default arena)
       gameState: 'waiting', // waiting, starting, in_progress, finished
       createdAt: new Date(),
       maxPlayers: 2

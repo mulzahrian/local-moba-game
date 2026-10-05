@@ -1,125 +1,62 @@
 import React, { useState } from 'react';
-import '../styles/Menu.css';
+import { PlayView } from './menu/PlayView.jsx';
+import { CreateRoomView } from './menu/CreateRoomView.jsx';
+import { JoinRoomView } from './menu/JoinRoomView.jsx';
+import { MapListView } from './menu/MapListView.jsx';
+import { SettingsView } from './menu/SettingsView.jsx';
+import { MenuBackdrop } from './MenuBackdrop.jsx';
+import { MapEditor } from './editor/MapEditor.jsx';
+import { useT } from '../i18n/index.js';
 
 export function MenuScreen({ onCreateRoom, onJoinRoom }) {
-  const [playerName, setPlayerName] = useState('');
-  const [roomCode, setRoomCode] = useState('');
-  const [mode, setMode] = useState('menu'); // menu, create, join
+  const t = useT();
+  const [view, setView] = useState('main'); // main, play, create, join, maps, editor, settings
+  const [editingMapId, setEditingMapId] = useState(null); // null = new map
 
-  const handleCreateRoom = () => {
-    if (playerName.trim()) {
-      onCreateRoom(playerName);
-    }
-  };
-
-  const handleJoinRoom = () => {
-    if (playerName.trim() && roomCode.trim()) {
-      onJoinRoom(playerName, roomCode);
-    }
-  };
-
-  if (mode === 'menu') {
-    return (
-      <div className="menu-container">
-        <div className="menu-content">
-          <div className="menu-header">
-            <h1 className="title">⚔️ MOBA GAME</h1>
-            <p className="subtitle">Multiplayer Online Battle Arena</p>
-          </div>
-
-          <div className="menu-input-group">
-            <input
-              type="text"
-              placeholder="Enter your name"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter' && playerName.trim()) {
-                  setMode('create');
-                }
-              }}
-              className="menu-input"
-            />
-          </div>
-
-          <div className="menu-buttons">
-            <button
-              className="menu-btn primary"
-              onClick={() => {
-                if (playerName.trim()) setMode('create');
-              }}
-              disabled={!playerName.trim()}
-            >
-              Create Room
-            </button>
-            <button
-              className="menu-btn secondary"
-              onClick={() => {
-                if (playerName.trim()) setMode('join');
-              }}
-              disabled={!playerName.trim()}
-            >
-              Join Room
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+  if (view === 'editor') {
+    return <MapEditor mapId={editingMapId} onExit={() => setView('maps')} />;
   }
 
-  if (mode === 'create') {
-    return (
-      <div className="menu-container">
-        <div className="menu-content">
-          <h2 className="mode-title">Create New Room</h2>
-          <p className="player-info">Player: <strong>{playerName}</strong></p>
-
-          <button className="menu-btn primary large" onClick={handleCreateRoom}>
-            Create Room
+  let content;
+  switch (view) {
+    case 'play':
+      content = <PlayView onNavigate={setView} />;
+      break;
+    case 'create':
+      content = <CreateRoomView onBack={() => setView('play')} onCreateRoom={onCreateRoom} />;
+      break;
+    case 'join':
+      content = <JoinRoomView onBack={() => setView('play')} onJoinRoom={onJoinRoom} />;
+      break;
+    case 'maps':
+      content = (
+        <MapListView
+          onBack={() => setView('main')}
+          onEdit={(id) => {
+            setEditingMapId(id);
+            setView('editor');
+          }}
+        />
+      );
+      break;
+    case 'settings':
+      content = <SettingsView onBack={() => setView('main')} />;
+      break;
+    default:
+      content = (
+        <div className="menu-buttons">
+          <button className="fantasy-btn primary" onClick={() => setView('play')}>
+            {t('menu.playGame')}
           </button>
-
-          <button className="menu-btn ghost" onClick={() => setMode('menu')}>
-            ← Back
+          <button className="fantasy-btn" onClick={() => setView('maps')}>
+            {t('menu.mapGenerator')}
           </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (mode === 'join') {
-    return (
-      <div className="menu-container">
-        <div className="menu-content">
-          <h2 className="mode-title">Join Room</h2>
-          <p className="player-info">Player: <strong>{playerName}</strong></p>
-
-          <input
-            type="text"
-            placeholder="Enter room code"
-            value={roomCode}
-            onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter' && roomCode.trim()) {
-                handleJoinRoom();
-              }
-            }}
-            className="menu-input large"
-            maxLength="6"
-          />
-
-          <button
-            className="menu-btn primary large"
-            onClick={handleJoinRoom}
-            disabled={!roomCode.trim()}
-          >
-            Join Room
-          </button>
-
-          <button className="menu-btn ghost" onClick={() => setMode('menu')}>
-            ← Back
+          <button className="fantasy-btn" onClick={() => setView('settings')}>
+            {t('menu.settings')}
           </button>
         </div>
-      </div>
-    );
+      );
   }
+
+  return <MenuBackdrop>{content}</MenuBackdrop>;
 }

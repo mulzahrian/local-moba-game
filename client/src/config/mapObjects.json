@@ -1,0 +1,21 @@
+{
+  "_readme": "Registry of objects available in the Map Generator. To add a new object: put the .glb file under src/model/ (e.g. src/model/map/tree/pine.glb) and add an entry to 'objects'. 'model' is the path relative to src/model/. Optional per-object fields: 'scale' (fixed scale; if omitted the model is auto-fitted so its largest side is 'size' units), 'size' (auto-fit size, default 10), 'yOffset' (lift above ground), 'rotationY' (default heading in degrees), 'defaultAnimation' (animation clip name played by default). GLB files under src/model/map/ that are NOT listed here are still auto-detected and shown in the category matching their folder.",
+  "categories": [
+    { "id": "tree", "icon": "🌲", "name": { "en": "Trees", "id": "Pohon" } },
+    { "id": "bush", "icon": "🌿", "name": { "en": "Bushes", "id": "Semak" } },
+    { "id": "props", "icon": "🪨", "name": { "en": "Props", "id": "Properti" } },
+    { "id": "building", "icon": "🏰", "name": { "en": "Buildings", "id": "Bangunan" } },
+    { "id": "animal", "icon": "🐺", "name": { "en": "Animals", "id": "Hewan" } },
+    { "id": "creature", "icon": "👾", "name": { "en": "Creatures", "id": "Makhluk" } }
+  ],
+  "objects": [
+    {
+      "id": "rimuru_tempest",
+      "category": "creature",
+      "name": { "en": "Rimuru Tempest", "id": "Rimuru Tempest" },
+      "model": "rimuru_tempest.glb",
+      "scale": 6,
+      "defaultAnimation": "lml_anim_idle"
+    }
+  ]
+}
