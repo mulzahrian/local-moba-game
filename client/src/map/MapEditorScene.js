@@ -4,6 +4,7 @@ import { MapObject, createUid } from './mapAssets.js';
 
 const GROUND_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const PAN_SPEED = 160;
+const CAMERA_ROTATE_SPEED = 90; // degrees per second for Q / E
 
 export const DEFAULT_MAP_SIZE = 500;
 export const DEFAULT_GROUND_COLOR = '#1a3a1a';
@@ -29,6 +30,7 @@ export class MapEditorScene {
     this.ghost = null;
     this.keys = new Set();
     this.disposed = false;
+    this.paused = false;
 
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
@@ -137,6 +139,49 @@ export class MapEditorScene {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
+  }
+
+  // Suspends rendering and keyboard shortcuts while the play preview covers the editor.
+  setPaused(paused) {
+    this.paused = paused;
+    this.keys.clear();
+    this.drag = null;
+  }
+
+  // ---------- Camera ----------
+
+  // Orbit the camera around its target by `degrees` (positive = counter-clockwise from above).
+  rotateCamera(degrees) {
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(degrees));
+    this.camera.position.copy(this.controls.target).add(offset);
+    this.camera.lookAt(this.controls.target);
+  }
+
+  // Change the viewing angle (degrees of elevation to add; positive = look more from above).
+  tiltCamera(degrees) {
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    const spherical = new THREE.Spherical().setFromVector3(offset);
+    spherical.phi = THREE.MathUtils.clamp(
+      spherical.phi - THREE.MathUtils.degToRad(degrees),
+      0.01,
+      this.controls.maxPolarAngle
+    );
+    offset.setFromSpherical(spherical);
+    this.camera.position.copy(this.controls.target).add(offset);
+    this.camera.lookAt(this.controls.target);
+  }
+
+  setCameraView(view) {
+    const distance = this.camera.position.distanceTo(this.controls.target);
+    const target = this.controls.target;
+    if (view === 'top') {
+      this.camera.position.set(target.x, target.y + distance, target.z + 0.01);
+    } else {
+      this.controls.target.set(0, 0, 0);
+      this.camera.position.set(0, 220, 260);
+    }
+    this.camera.lookAt(this.controls.target);
   }
 
   // ---------- Map data ----------
@@ -341,7 +386,22 @@ export class MapEditorScene {
       while (node && node.userData.uid === undefined) node = node.parent;
       if (node) return node.userData.uid;
     }
-    return null;
+
+    // Fallback for thin / sparse models: pick the nearest bounding box under the cursor.
+    let best = null;
+    let bestDistance = Infinity;
+    const box = new THREE.Box3();
+    const hitPoint = new THREE.Vector3();
+    this.entries.forEach((entry) => {
+      box.setFromObject(entry.object.root);
+      if (box.isEmpty() || !this.raycaster.ray.intersectBox(box, hitPoint)) return;
+      const distance = hitPoint.distanceTo(this.raycaster.ray.origin);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = entry.data.uid;
+      }
+    });
+    return best;
   }
 
   handlePointerDown(event) {
@@ -349,12 +409,18 @@ export class MapEditorScene {
     this.setPointer(event);
     const point = this.groundPoint();
 
+    const uid = this.pickObject();
+
+    // While placing, clicking an existing object selects it instead (Shift+click places anyway).
     if (this.placingType) {
-      if (point) this.placeAt(point);
-      return;
+      if (uid && !event.shiftKey) {
+        this.setPlacingType(null);
+      } else {
+        if (point) this.placeAt(point);
+        return;
+      }
     }
 
-    const uid = this.pickObject();
     this.select(uid);
     if (uid && point) {
       const entry = this.entries.get(uid);
@@ -380,6 +446,12 @@ export class MapEditorScene {
       }
     }
 
+    if (!this.drag) {
+      const el = this.renderer.domElement;
+      if (this.placingType) el.style.cursor = 'crosshair';
+      else el.style.cursor = this.pickObject() ? 'pointer' : 'default';
+    }
+
     if (this.drag && point) {
       const entry = this.entries.get(this.drag.uid);
       if (!entry) return;
@@ -397,8 +469,13 @@ export class MapEditorScene {
   }
 
   handleKeyDown(event) {
+    if (this.paused) return;
     const tag = event.target?.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    const inputType = event.target?.type;
+    // Sliders / checkboxes keep focus after use, so only real text entry should swallow shortcuts.
+    const isTyping =
+      tag === 'TEXTAREA' || (tag === 'INPUT' && !['range', 'checkbox', 'color', 'button'].includes(inputType));
+    if (isTyping || tag === 'SELECT') return;
     if (!event.ctrlKey && !event.metaKey) this.keys.add(event.code);
 
     const selected = this.entries.get(this.selectedUid);
@@ -413,7 +490,11 @@ export class MapEditorScene {
         this.setPlacingType(null);
         this.select(null);
         break;
+      case 'KeyV':
+        if (!event.ctrlKey && !event.metaKey) this.setPlacingType(null);
+        break;
       case 'KeyR':
+        if (event.ctrlKey || event.metaKey || event.repeat) break;
         if (this.placingType) {
           this.updatePlaceSettings({ rotationY: (this.placeSettings.rotationY + rotateStep + 360) % 360 });
         } else if (selected) {
@@ -463,7 +544,10 @@ export class MapEditorScene {
     if (this.disposed) return;
     this.frameId = requestAnimationFrame(this.animate);
     const delta = this.clock.getDelta();
+    if (this.paused) return;
     this.panWithKeys(delta);
+    if (this.keys.has('KeyQ')) this.rotateCamera(-CAMERA_ROTATE_SPEED * delta);
+    if (this.keys.has('KeyE')) this.rotateCamera(CAMERA_ROTATE_SPEED * delta);
     this.controls.update();
     this.entries.forEach((entry) => entry.object.update(delta));
     this.ghost?.update(delta);

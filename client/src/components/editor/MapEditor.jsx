@@ -8,6 +8,8 @@ import {
   localizedName
 } from '../../map/mapAssets.js';
 import { mapApi } from '../../map/mapApi.js';
+import { GameScene } from '../../scenes/GameScene.js';
+import { CategoryIcon, CameraIcon } from './FantasyIcons.jsx';
 import { useT } from '../../i18n/index.js';
 import { useSettingsStore } from '../../store/settingsStore.js';
 import '../../styles/MapEditor.css';
@@ -84,6 +86,8 @@ export function MapEditor({ mapId, onExit }) {
   const [dirty, setDirty] = useState(false);
   const [status, setStatus] = useState(null); // { type: 'ok' | 'error', text }
   const [animationNames, setAnimationNames] = useState([]);
+  const [previewMap, setPreviewMap] = useState(null);
+  const previewRef = useRef(null);
 
   const categories = getCategories();
   const definitions = useMemo(() => getObjectDefinitions(), []);
@@ -206,6 +210,39 @@ export function MapEditor({ mapId, onExit }) {
 
   const updateSelected = (patch) => scene().updateSelected(patch);
 
+  const startPreview = () => {
+    scene().select(null);
+    scene().setPlacingType(null);
+    scene().setPaused(true);
+    setPreviewMap({ size, groundColor, objects: scene().getObjects() });
+  };
+
+  const stopPreview = () => {
+    setPreviewMap(null);
+    scene()?.setPaused(false);
+  };
+
+  useEffect(() => {
+    if (!previewMap || !previewRef.current) return undefined;
+    const game = new GameScene(previewRef.current);
+    game.loadMap(previewMap);
+    const spawn = previewMap.size * 0.4;
+    game.addPlayer(
+      'preview',
+      { id: 'preview', name: t('editor.previewPlayer'), team: 'team1', position: { x: -spawn, z: -spawn } },
+      true
+    );
+    const onKey = (e) => {
+      if (e.code === 'Escape') stopPreview();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      game.dispose();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewMap]);
+
   return (
     <div className="editor-root">
       <header className="editor-topbar">
@@ -224,6 +261,7 @@ export function MapEditor({ mapId, onExit }) {
         {dirty && <span className="ed-dirty">● {t('editor.unsaved')}</span>}
         {status && <span className={`ed-status ${status.type}`}>{status.text}</span>}
         <div className="ed-spacer" />
+        <button className="ed-btn" onClick={startPreview}>▶ {t('editor.preview')}</button>
         <button className="ed-btn primary" onClick={save}>💾 {t('editor.save')}</button>
       </header>
 
@@ -231,6 +269,13 @@ export function MapEditor({ mapId, onExit }) {
         <aside className="editor-panel left">
           <h3>{t('editor.objects')}</h3>
           <div className="ed-tabs">
+            <button
+              className={`ed-tab ${!placingType ? 'active' : ''}`}
+              title={t('editor.selectTool')}
+              onClick={() => scene().setPlacingType(null)}
+            >
+              <CameraIcon name="cursor" />
+            </button>
             {categories.map((c) => (
               <button
                 key={c.id}
@@ -238,7 +283,7 @@ export function MapEditor({ mapId, onExit }) {
                 title={c.name[language] || c.name.en}
                 onClick={() => setCategory(c.id)}
               >
-                {c.icon}
+                <CategoryIcon id={c.id} />
               </button>
             ))}
           </div>
@@ -282,7 +327,17 @@ export function MapEditor({ mapId, onExit }) {
           </label>
         </aside>
 
-        <div className="editor-viewport" ref={containerRef} />
+        <div className="editor-viewport-wrap">
+          <div className="editor-viewport" ref={containerRef} />
+          <div className="ed-camera-bar">
+            <button className="ed-cam-btn" title={t('editor.camRotateLeft')} onClick={() => scene().rotateCamera(-45)}><CameraIcon name="rotateLeft" /></button>
+            <button className="ed-cam-btn" title={t('editor.camRotateRight')} onClick={() => scene().rotateCamera(45)}><CameraIcon name="rotateRight" /></button>
+            <button className="ed-cam-btn" title={t('editor.camTiltUp')} onClick={() => scene().tiltCamera(15)}><CameraIcon name="tiltUp" /></button>
+            <button className="ed-cam-btn" title={t('editor.camTiltDown')} onClick={() => scene().tiltCamera(-15)}><CameraIcon name="tiltDown" /></button>
+            <button className="ed-cam-btn" title={t('editor.camTop')} onClick={() => scene().setCameraView('top')}><CameraIcon name="top" /></button>
+            <button className="ed-cam-btn" title={t('editor.camReset')} onClick={() => scene().setCameraView('reset')}><CameraIcon name="reset" /></button>
+          </div>
+        </div>
 
         <aside className="editor-panel right">
           {selected && (
@@ -341,6 +396,16 @@ export function MapEditor({ mapId, onExit }) {
       </div>
 
       <footer className="editor-help">{t('editor.help')}</footer>
+
+      {previewMap && (
+        <div className="editor-preview">
+          <div className="editor-preview-bar">
+            <button className="ed-btn" onClick={stopPreview}>← {t('editor.exitPreview')}</button>
+            <span className="editor-preview-hint">{t('editor.previewHelp')}</span>
+          </div>
+          <div className="editor-preview-stage" ref={previewRef} />
+        </div>
+      )}
     </div>
   );
 }

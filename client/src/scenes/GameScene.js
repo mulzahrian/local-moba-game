@@ -97,7 +97,8 @@ export class GameScene {
     this.renderer.shadowMap.enabled = true;
     this.container.appendChild(this.renderer.domElement);
 
-    window.addEventListener('resize', () => this.onWindowResize());
+    this.onResize = () => this.onWindowResize();
+    window.addEventListener('resize', this.onResize);
   }
 
   setupScene() {
@@ -447,8 +448,10 @@ export class GameScene {
   }
 
   setupEventListeners() {
-    this.container.addEventListener('click', (e) => this.onMouseClick(e));
-    this.container.addEventListener('mousemove', (e) => this.onMouseMove(e));
+    this.onClick = (e) => this.onMouseClick(e);
+    this.onMove = (e) => this.onMouseMove(e);
+    this.container.addEventListener('click', this.onClick);
+    this.container.addEventListener('mousemove', this.onMove);
   }
 
   onMouseClick(event) {
@@ -511,7 +514,7 @@ export class GameScene {
   }
 
   animate = () => {
-    requestAnimationFrame(this.animate);
+    this.frameId = requestAnimationFrame(this.animate);
 
     const delta = this.clock.getDelta();
     this.updateLocalMovement(delta);
@@ -530,9 +533,10 @@ export class GameScene {
   };
 
   dispose() {
-    this.container.removeEventListener('click', this.onMouseClick);
-    this.container.removeEventListener('mousemove', this.onMouseMove);
-    window.removeEventListener('resize', this.onWindowResize);
+    cancelAnimationFrame(this.frameId);
+    this.container.removeEventListener('click', this.onClick);
+    this.container.removeEventListener('mousemove', this.onMove);
+    window.removeEventListener('resize', this.onResize);
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
     this.clearMapObjects();

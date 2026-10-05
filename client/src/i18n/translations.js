@@ -87,8 +87,19 @@ export const translations = {
     'editor.groundColor': 'Ground color',
     'editor.mapSize': 'Map size',
     'editor.count': 'Objects placed: {count}',
+    'editor.preview': 'Preview',
+    'editor.exitPreview': 'Back to editor',
+    'editor.previewPlayer': 'You',
+    'editor.previewHelp': 'Preview: WASD / arrows to move your character • Esc to return to the editor (unsaved changes are included)',
+    'editor.selectTool': 'Select tool (V) – click placed objects to edit or delete them',
+    'editor.camRotateLeft': 'Rotate view left (Q)',
+    'editor.camRotateRight': 'Rotate view right (E)',
+    'editor.camTiltUp': 'Look from above',
+    'editor.camTiltDown': 'Look from the side',
+    'editor.camTop': 'Top-down view',
+    'editor.camReset': 'Reset view',
     'editor.help':
-      'Left click: place / select / drag • Right drag: rotate camera • Middle drag or WASD: pan • Wheel: zoom • R: rotate (Shift = reverse) • [ ]: scale • Ctrl+D: duplicate • Del: delete • Esc: cancel',
+      'Left click: place / select / drag (Shift+click while placing = place on top of an object) • Right drag or Q/E: rotate camera • Middle drag or WASD: pan • Wheel: zoom • R: rotate object (Shift = reverse) • [ ]: scale • Ctrl+D: duplicate • Del: delete • Esc: cancel',
 
     'hud.leave': 'Leave'
   },
@@ -175,8 +186,19 @@ export const translations = {
     'editor.groundColor': 'Warna tanah',
     'editor.mapSize': 'Ukuran peta',
     'editor.count': 'Objek terpasang: {count}',
+    'editor.preview': 'Pratinjau',
+    'editor.exitPreview': 'Kembali ke editor',
+    'editor.previewPlayer': 'Kamu',
+    'editor.previewHelp': 'Pratinjau: WASD / panah untuk menggerakkan karakter • Esc untuk kembali ke editor (perubahan yang belum disimpan ikut tampil)',
+    'editor.selectTool': 'Alat pilih (V) – klik objek yang sudah diletakkan untuk mengedit atau menghapusnya',
+    'editor.camRotateLeft': 'Putar tampilan ke kiri (Q)',
+    'editor.camRotateRight': 'Putar tampilan ke kanan (E)',
+    'editor.camTiltUp': 'Lihat dari atas',
+    'editor.camTiltDown': 'Lihat dari samping',
+    'editor.camTop': 'Tampilan atas',
+    'editor.camReset': 'Reset tampilan',
     'editor.help':
-      'Klik kiri: letakkan / pilih / geser • Geser klik kanan: putar kamera • Geser klik tengah atau WASD: geser kamera • Scroll: zoom • R: putar (Shift = balik) • [ ]: ukuran • Ctrl+D: gandakan • Del: hapus • Esc: batal',
+      'Klik kiri: letakkan / pilih / geser (Shift+klik saat meletakkan = letakkan di atas objek) • Geser klik kanan atau Q/E: putar kamera • Geser klik tengah atau WASD: geser kamera • Scroll: zoom • R: putar objek (Shift = balik) • [ ]: ukuran • Ctrl+D: gandakan • Del: hapus • Esc: batal',
 
     'hud.leave': 'Keluar'
   }
