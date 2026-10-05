@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MenuScreen } from './components/MenuScreen.jsx';
 import { ChatPanel } from './components/ChatPanel.jsx';
 import { GameHUD } from './components/GameHUD.jsx';
@@ -54,6 +54,7 @@ function App() {
 
   const gameContainerRef = useRef(null);
   const gameSceneRef = useRef(null);
+  const getGameScene = useCallback(() => gameSceneRef.current, []);
 
   // Initialize socket connection ONCE on mount.
   // IMPORTANT: empty dependency array — re-running this effect would
@@ -85,6 +86,26 @@ function App() {
 
     socketService.on('playerAttacked', (data) => {
       console.log('Player attacked:', data);
+    });
+
+    // Attacks, skills and emotes resolved by the server (damage, knockback, animations, effects)
+    socketService.on('skillUsed', (data) => {
+      setPlayers(data.players);
+      if (gameSceneRef.current) gameSceneRef.current.handleSkillUsed(data);
+    });
+
+    socketService.on('statsUpdated', (data) => {
+      const stats = new Map(data.stats.map((s) => [s.id, s]));
+      setPlayers(useGameStore.getState().players.map((p) => (stats.has(p.id) ? { ...p, ...stats.get(p.id) } : p)));
+    });
+
+    socketService.on('playerDied', (data) => {
+      if (gameSceneRef.current) gameSceneRef.current.handlePlayerDied(data.playerId);
+    });
+
+    socketService.on('playerRespawned', (data) => {
+      setPlayers(useGameStore.getState().players.map((p) => (p.id === data.player.id ? { ...p, ...data.player } : p)));
+      if (gameSceneRef.current) gameSceneRef.current.handlePlayerRespawned(data.player);
     });
 
     socketService.on('messageReceived', (data) => {
@@ -137,7 +158,7 @@ function App() {
 
   // Handle create room
   const handleCreateRoom = (playerName, mapId, environment) => {
-    socketService.createRoom(playerName, mapId, environment, (response) => {
+    socketService.createRoom(playerName, mapId, environment, useSettingsStore.getState().characterId, (response) => {
       if (response.success) {
         console.log('Room created:', response.roomCode);
         setRoomCode(response.roomCode);
@@ -158,7 +179,7 @@ function App() {
   // Handle join room
   const handleJoinRoom = (playerName, code) => {
     console.log(`[Client] Attempting to join room: ${code}`);
-    socketService.joinRoom(code, playerName, (response) => {
+    socketService.joinRoom(code, playerName, useSettingsStore.getState().characterId, (response) => {
       console.log(`[Client] Join response:`, response);
       if (response.success) {
         setRoomCode(response.room.code);
@@ -233,6 +254,7 @@ function App() {
             players={players}
             currentPlayerId={socketService.socket?.id}
             roomCode={roomCode}
+            getScene={getGameScene}
             onLeaveRoom={handleLeaveRoom}
           />
           <ChatPanel

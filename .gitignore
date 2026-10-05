@@ -15,3 +15,6 @@ yarn-error.log*
 *~
 .cache/
 build/
+
+# user-uploaded characters (GLB models and profile images)
+server/data/characters/

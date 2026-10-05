@@ -1,7 +1,8 @@
 import React from 'react';
+import { SkillBar } from './SkillBar.jsx';
 import '../styles/HUD.css';
 
-export function GameHUD({ players, currentPlayerId, roomCode, onLeaveRoom }) {
+export function GameHUD({ players, currentPlayerId, roomCode, getScene, onLeaveRoom }) {
   const currentPlayer = players.find(p => p.id === currentPlayerId);
 
   return (
@@ -26,10 +27,10 @@ export function GameHUD({ players, currentPlayerId, roomCode, onLeaveRoom }) {
               <div className="stat-bar hp-bar">
                 <div
                   className="stat-fill"
-                  style={{ width: `${(currentPlayer.health / 100) * 100}%` }}
+                  style={{ width: `${(currentPlayer.health / (currentPlayer.maxHealth || 100)) * 100}%` }}
                 ></div>
               </div>
-              <span className="stat-value">{currentPlayer.health}/100</span>
+              <span className="stat-value">{Math.round(currentPlayer.health)}/{currentPlayer.maxHealth || 100}</span>
             </div>
 
             <div className="stat-item">
@@ -37,10 +38,10 @@ export function GameHUD({ players, currentPlayerId, roomCode, onLeaveRoom }) {
               <div className="stat-bar mana-bar">
                 <div
                   className="stat-fill"
-                  style={{ width: `${(currentPlayer.mana / 100) * 100}%` }}
+                  style={{ width: `${(currentPlayer.mana / (currentPlayer.maxMana || 100)) * 100}%` }}
                 ></div>
               </div>
-              <span className="stat-value">{currentPlayer.mana}/100</span>
+              <span className="stat-value">{Math.round(currentPlayer.mana)}/{currentPlayer.maxMana || 100}</span>
             </div>
 
             <div className="stat-item">
@@ -69,6 +70,8 @@ export function GameHUD({ players, currentPlayerId, roomCode, onLeaveRoom }) {
           ))}
         </div>
       </div>
+
+      <SkillBar getScene={getScene} />
 
       {/* Mini Map */}
       <div className="hud-bottom-right">

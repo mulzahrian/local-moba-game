@@ -73,22 +73,22 @@ class SocketService {
   }
 
   // Room Management
-  createRoom(playerName, mapId, environment, callback) {
+  createRoom(playerName, mapId, environment, characterId, callback) {
     if (!this.socket) {
       console.error('Socket not connected');
       return;
     }
-    this.socket.emit('createRoom', { playerName, mapId, environment }, (response) => {
+    this.socket.emit('createRoom', { playerName, mapId, environment, characterId }, (response) => {
       if (callback) callback(response);
     });
   }
 
-  joinRoom(roomCode, playerName, callback) {
+  joinRoom(roomCode, playerName, characterId, callback) {
     if (!this.socket) {
       console.error('Socket not connected');
       return;
     }
-    this.socket.emit('joinRoom', { roomCode, playerName }, (response) => {
+    this.socket.emit('joinRoom', { roomCode, playerName, characterId }, (response) => {
       if (callback) callback(response);
     });
   }

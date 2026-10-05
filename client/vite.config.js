@@ -5,6 +5,8 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3002,
-    host: '0.0.0.0'
+    host: '0.0.0.0',
+    // ../shared (character roles / skills) is shared with the server
+    fs: { allow: ['..'] }
   }
 });

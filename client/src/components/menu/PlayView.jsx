@@ -1,12 +1,15 @@
 import React from 'react';
 import { useT } from '../../i18n/index.js';
 import { useSettingsStore } from '../../store/settingsStore.js';
+import { CharacterPicker } from '../character/CharacterPicker.jsx';
 
 export function PlayView({ onNavigate }) {
   const t = useT();
   const playerName = useSettingsStore((s) => s.playerName);
   const setPlayerName = useSettingsStore((s) => s.setPlayerName);
-  const ready = playerName.trim().length > 0;
+  const characterId = useSettingsStore((s) => s.characterId);
+  const setCharacterId = useSettingsStore((s) => s.setCharacterId);
+  const ready = playerName.trim().length > 0 && characterId !== '';
 
   return (
     <div className="menu-panel">
@@ -22,6 +25,10 @@ export function PlayView({ onNavigate }) {
         maxLength={20}
         onChange={(e) => setPlayerName(e.target.value)}
       />
+
+      <label className="field-label char-picker-label">{t('pick.title')}</label>
+      <CharacterPicker value={characterId} onChange={setCharacterId} />
+      {characterId === '' && <p className="hint">{t('pick.required')}</p>}
 
       <div className="menu-buttons">
         <button className="fantasy-btn primary" disabled={!ready} onClick={() => onNavigate('create')}>

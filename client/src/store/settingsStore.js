@@ -7,9 +7,11 @@ export const useSettingsStore = create(
       musicOn: true,
       language: 'en',
       playerName: '',
+      characterId: '',
       setMusicOn: (musicOn) => set({ musicOn }),
       setLanguage: (language) => set({ language }),
-      setPlayerName: (playerName) => set({ playerName })
+      setPlayerName: (playerName) => set({ playerName }),
+      setCharacterId: (characterId) => set({ characterId })
     }),
     { name: 'moba-settings' }
   )

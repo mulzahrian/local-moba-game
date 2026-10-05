@@ -5,6 +5,15 @@ import cors from 'cors';
 import { generateRoomCode } from '../shared/utils.js';
 import GameManager from './managers/GameManager.js';
 import mapStore, { sanitizeEnvironment } from './managers/MapStore.js';
+import characterStore, {
+  MAX_IMAGE_BYTES,
+  MAX_MODEL_BYTES,
+  imageContentType,
+  imageTypeOf,
+  isGlb
+} from './managers/CharacterStore.js';
+import { resolveAction } from './managers/combat.js';
+import { BUILTIN_CHARACTER_ID, DEFAULT_ROLE } from '../shared/characterConfig.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -82,6 +91,108 @@ app.delete('/api/maps/:id', async (req, res) => {
   }
 });
 
+// Character API (each character lives in server/data/characters/<id>: JSON + GLB model + profile image)
+const withVersion = (character) => ({ ...character, version: character.updatedAt });
+
+app.get('/api/characters', async (req, res) => {
+  try {
+    res.json({ success: true, characters: (await characterStore.list()).map(withVersion) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.get('/api/characters/:id', async (req, res) => {
+  try {
+    const character = await characterStore.get(req.params.id);
+    if (!character) return res.status(404).json({ success: false, message: 'Character not found' });
+    res.json({ success: true, character: withVersion(character) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.post('/api/characters', async (req, res) => {
+  try {
+    res.status(201).json({ success: true, character: withVersion(await characterStore.create(req.body)) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.put('/api/characters/:id', async (req, res) => {
+  try {
+    const character = await characterStore.update(req.params.id, req.body);
+    if (!character) return res.status(404).json({ success: false, message: 'Character not found' });
+    res.json({ success: true, character: withVersion(character) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.put('/api/characters/:id/model', express.raw({ type: () => true, limit: MAX_MODEL_BYTES }), async (req, res) => {
+  try {
+    if (!Buffer.isBuffer(req.body) || !isGlb(req.body)) {
+      return res.status(400).json({ success: false, message: 'File must be a .glb model' });
+    }
+    const character = await characterStore.saveModel(req.params.id, req.body);
+    if (!character) return res.status(404).json({ success: false, message: 'Character not found' });
+    res.json({ success: true, character: withVersion(character) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.put('/api/characters/:id/image', express.raw({ type: () => true, limit: MAX_IMAGE_BYTES }), async (req, res) => {
+  try {
+    const ext = Buffer.isBuffer(req.body) ? imageTypeOf(req.body) : null;
+    if (!ext) return res.status(400).json({ success: false, message: 'File must be a PNG, JPG, WEBP or GIF image' });
+    const character = await characterStore.saveImage(req.params.id, req.body, ext);
+    if (!character) return res.status(404).json({ success: false, message: 'Character not found' });
+    res.json({ success: true, character: withVersion(character) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.get('/api/characters/:id/model', async (req, res) => {
+  try {
+    const character = await characterStore.get(req.params.id);
+    if (!character?.hasModel) return res.status(404).json({ success: false, message: 'Model not found' });
+    res.type('model/gltf-binary').sendFile(characterStore.modelPath(character.id));
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.get('/api/characters/:id/image', async (req, res) => {
+  try {
+    const character = await characterStore.get(req.params.id);
+    const file = characterStore.imagePath(character);
+    if (!file) return res.status(404).json({ success: false, message: 'Image not found' });
+    res.type(imageContentType(character.imageExt)).sendFile(file);
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.delete('/api/characters/:id', async (req, res) => {
+  try {
+    const removed = await characterStore.remove(req.params.id);
+    if (!removed) return res.status(404).json({ success: false, message: 'Character not found' });
+    res.json({ success: true });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+// Resolves the character a player picked into the data the room needs (null when it does not exist).
+async function resolveCharacter(characterId) {
+  if (characterId === BUILTIN_CHARACTER_ID) return { id: BUILTIN_CHARACTER_ID, role: DEFAULT_ROLE };
+  const character = await characterStore.get(characterId);
+  return character?.hasModel ? { id: character.id, role: character.role } : null;
+}
+
 // Socket.IO Events
 io.on('connection', (socket) => {
   console.log(`[${new Date().toLocaleTimeString()}] Player connected: ${socket.id}`);
@@ -107,7 +218,15 @@ io.on('connection', (socket) => {
         }
       }
 
-      const room = gameManager.createRoom(roomCode, socket.id, data.playerName, map, sanitizeEnvironment(data.environment, map || {}));
+      const character = await resolveCharacter(data.characterId);
+      if (!character) {
+        if (typeof ack === 'function') {
+          ack({ success: false, message: 'Character not found' });
+        }
+        return;
+      }
+
+      const room = gameManager.createRoom(roomCode, socket.id, data.playerName, map, sanitizeEnvironment(data.environment, map || {}), character);
         
       if (room) {
         socket.join(roomCode);
@@ -145,7 +264,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('joinRoom', (data, ack) => {
+  socket.on('joinRoom', async (data, ack) => {
     try {
       console.log(`\n[JoinRoom] ========== JOIN ROOM REQUEST ==========`);
       console.log(`[JoinRoom] Data received:`, JSON.stringify(data));
@@ -172,7 +291,15 @@ io.on('connection', (socket) => {
       console.log(`[JoinRoom] Room codes in storage: ${Array.from(gameManager.rooms.keys()).join(", ") || "NONE"}`);
         
       console.log(`[JoinRoom] Calling gameManager.joinRoom...`);
-      const room = gameManager.joinRoom(normalizedRoomCode, socket.id, playerName);
+      const character = await resolveCharacter(data.characterId);
+      if (!character) {
+        if (typeof ack === 'function') {
+          ack({ success: false, message: 'Character not found' });
+        }
+        return;
+      }
+
+      const room = gameManager.joinRoom(normalizedRoomCode, socket.id, playerName, character);
       console.log(`[JoinRoom] gameManager.joinRoom returned:`, room ? 'ROOM OBJECT' : 'NULL');
 
       if (room) {
@@ -242,7 +369,7 @@ io.on('connection', (socket) => {
     
     if (room) {
       const player = room.players.find(p => p.id === socket.id);
-      if (player) {
+      if (player && !player.dead) {
         player.position = position;
         io.to(roomCode).emit('playerMoved', {
           playerId: socket.id,
@@ -262,6 +389,23 @@ io.on('connection', (socket) => {
         targetId: targetId
       });
     }
+  });
+
+  // Attacks, skills and emotes (attack1/2, skill1-3, emote): validated and resolved on the server.
+  socket.on('useSkill', (data) => {
+    const room = gameManager.getRoom(data?.roomCode);
+    const caster = room?.players.find((p) => p.id === socket.id);
+    if (!room || !caster) return;
+
+    const event = resolveAction(room, caster, data.slot, data.dir);
+    if (!event) return;
+
+    io.to(room.code).emit('skillUsed', { ...event, players: room.players });
+    event.hits.filter((hit) => hit.died).forEach((hit) => {
+      console.log(`[Combat] ${hit.targetId} was defeated by ${caster.id}`);
+      gameManager.scheduleRespawn(room.code, hit.targetId);
+      io.to(room.code).emit('playerDied', { playerId: hit.targetId, killerId: caster.id });
+    });
   });
 
   // Chat Events

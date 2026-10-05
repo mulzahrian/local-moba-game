@@ -1,15 +1,13 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
-import characterModelUrl from '../model/rimuru_tempest.glb?url';
 import { MapObject } from '../map/mapAssets.js';
 import { Environment, createGroundGeometry, createGroundMaterial } from '../map/environment.js';
+import { BUILTIN_CHARACTER_ID, COMBO_WINDOW_SECONDS, getActionDef, getManaCost } from '../../../shared/characterConfig.js';
+import { CharacterActor } from '../character/CharacterActor.js';
+import { getCharacterDefinition, loadGltf } from '../character/characterAssets.js';
+import { EffectManager } from '../character/effects.js';
 
-const ANIM_IDLE = 'lml_anim_idle';
-const ANIM_RUN = 'lml_anim_run';
-const CHARACTER_SCALE = 6 * 0.25; // characters are drawn at 0.25x relative to the map
-const UNIT_SCALE = CHARACTER_SCALE / 6; // applied to character-attached helpers (ring, label)
-const MOVE_SPEED = 45 * UNIT_SCALE; // units per second, scaled with the character
+const UNIT_SCALE = 0.25; // characters are drawn at 0.25x relative to the map; scales character-attached helpers
+const MOVE_SPEED = 45 * UNIT_SCALE; // units per second
 const CAMERA_FOV = 60;
 const CAMERA_OFFSET = new THREE.Vector3(23, 35, 35); // follow-camera offset from the focus point
 const CAMERA_FOLLOW_SMOOTHING = 8; // higher = camera catches up faster
@@ -17,6 +15,16 @@ const DEFAULT_ARENA_SIZE = 500;
 const NETWORK_SYNC_INTERVAL = 0.05; // seconds between position broadcasts (20Hz)
 const MOVE_EPSILON_SQ = 0.0005; // squared distance threshold to consider a remote player "moving"
 const REMOTE_IDLE_TIMEOUT_MS = 200; // remote player is idle if no movement update arrived within this time
+const SEND_LOCK_MS = 120; // minimum gap between two action requests from the local player
+const DASH_SECONDS = 0.25;
+const KNOCKBACK_SECONDS = 0.3;
+const KNOCKBACK_STUN_MS = 400;
+
+const KEY_ACTIONS = { KeyZ: 'skill1', KeyX: 'skill2', KeyC: 'skill3', KeyQ: 'emote' };
+
+const isTypingTarget = (target) =>
+  target instanceof HTMLElement &&
+  (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable);
 
 export class GameScene {
   constructor(container) {
@@ -37,12 +45,15 @@ export class GameScene {
     this.setupBoard();
 
     this.players = new Map();
-    this.enemies = new Map();
-    this.selectedPlayer = null;
+    this.pendingPlayers = new Map(); // playerId -> { playerData, isCurrentPlayer } while the character model loads
+    this.effects = new EffectManager(this.scene);
+    this.floaters = []; // floating damage / heal numbers
+    this.disposed = false;
 
     this.raycaster = new THREE.Raycaster();
     this.mouse = new THREE.Vector2();
-    
+    this.groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
     this.socketService = null;
     this.roomCode = null;
 
@@ -53,36 +64,21 @@ export class GameScene {
     this.cameraFocus = new THREE.Vector3();
     this.cameraSnapPending = true;
 
-    // Character model (shared template, cloned per player once loaded)
-    this.characterTemplate = null;
-    this.pendingPlayers = [];
-    this.loadCharacterModel();
-
     this.setupEventListeners();
     this.setupKeyboardControls();
     this.animate();
   }
 
-  loadCharacterModel() {
-    const loader = new GLTFLoader();
-    loader.load(
-      characterModelUrl,
-      (gltf) => {
-        this.characterTemplate = gltf;
-        // Flush players that were requested before the model finished loading
-        const queued = this.pendingPlayers;
-        this.pendingPlayers = [];
-        queued.forEach(({ playerId, playerData, isCurrentPlayer }) => {
-          this.createPlayerCharacter(playerId, playerData, isCurrentPlayer);
-        });
-      },
-      undefined,
-      (error) => console.error('[GameScene] Failed to load character model:', error)
-    );
-  }
-
   setupKeyboardControls() {
-    this.onKeyDown = (event) => this.setKeyState(event.code, true);
+    this.onKeyDown = (event) => {
+      if (isTypingTarget(event.target)) return;
+      const action = KEY_ACTIONS[event.code];
+      if (action) {
+        if (!event.repeat || action !== 'emote') this.performAction(action);
+        return;
+      }
+      this.setKeyState(event.code, true);
+    };
     this.onKeyUp = (event) => this.setKeyState(event.code, false);
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
@@ -233,42 +229,46 @@ export class GameScene {
     this.boardGroup.add(base);
   }
   addPlayer(playerId, playerData, isCurrentPlayer = false) {
-    if (this.players.has(playerId)) {
-      this.updatePlayer(playerId, playerData);
+    const existing = this.players.get(playerId);
+    if (existing) {
+      // Only refresh stats / metadata; the live position is owned by the scene (movement, knockback)
+      existing.data = { ...existing.data, ...playerData, position: existing.data.position };
       return;
     }
 
-    const queuedEntry = this.pendingPlayers.find((p) => p.playerId === playerId);
-    if (queuedEntry) {
-      queuedEntry.playerData = playerData;
-      queuedEntry.isCurrentPlayer = isCurrentPlayer;
+    const queued = this.pendingPlayers.get(playerId);
+    if (queued) {
+      queued.playerData = { ...queued.playerData, ...playerData };
+      queued.isCurrentPlayer = isCurrentPlayer;
       return;
     }
 
-    if (!this.characterTemplate) {
-      // Model is still loading - queue this player and create them once it's ready
-      this.pendingPlayers.push({ playerId, playerData, isCurrentPlayer });
-      return;
-    }
-
-    this.createPlayerCharacter(playerId, playerData, isCurrentPlayer);
+    // The character's model is downloaded first; the player is created once it is ready
+    this.pendingPlayers.set(playerId, { playerData, isCurrentPlayer });
+    this.loadCharacter(playerData.characterId)
+      .then(({ def, gltf }) => {
+        const entry = this.pendingPlayers.get(playerId);
+        if (this.disposed || !entry) return;
+        this.pendingPlayers.delete(playerId);
+        this.createPlayerCharacter(playerId, entry.playerData, entry.isCurrentPlayer, def, gltf);
+      })
+      .catch((error) => {
+        console.error('[GameScene] Failed to load character:', error);
+        this.pendingPlayers.delete(playerId);
+      });
   }
 
-  createPlayerCharacter(playerId, playerData, isCurrentPlayer) {
+  async loadCharacter(characterId) {
+    const def = await getCharacterDefinition(characterId || BUILTIN_CHARACTER_ID);
+    const gltf = await loadGltf(def.modelUrl);
+    return { def, gltf };
+  }
+
+  createPlayerCharacter(playerId, playerData, isCurrentPlayer, def, gltf) {
     if (this.players.has(playerId)) return;
 
-    const model = SkeletonUtils.clone(this.characterTemplate.scene);
-    model.scale.setScalar(CHARACTER_SCALE);
-    model.traverse((child) => {
-      if (child.isMesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-        // Clone materials so per-player highlighting doesn't affect other instances
-        if (child.material) {
-          child.material = child.material.clone();
-        }
-      }
-    });
+    const actor = new CharacterActor(gltf, def);
+    const { model } = actor;
 
     const teamColor = playerData.team === 'team1' ? 0xff6b6b : 0x4ecdc4;
 
@@ -311,38 +311,33 @@ export class GameScene {
 
     this.scene.add(group);
 
-    const mixer = new THREE.AnimationMixer(model);
-    const clips = this.characterTemplate.animations;
-    const idleClip = THREE.AnimationClip.findByName(clips, ANIM_IDLE);
-    const runClip = THREE.AnimationClip.findByName(clips, ANIM_RUN);
-    const actions = {
-      idle: idleClip ? mixer.clipAction(idleClip) : null,
-      run: runClip ? mixer.clipAction(runClip) : null
-    };
-
-    const currentAction = actions.idle || actions.run || null;
-    if (currentAction) currentAction.play();
-
     this.players.set(playerId, {
+      playerId,
       mesh: group,
       model,
-      mixer,
-      actions,
-      currentAction,
+      actor,
+      def,
+      role: playerData.role || def.role,
       data: playerData,
       isCurrentPlayer,
       isMoving: false,
-      lastMoveTime: 0
+      lastMoveTime: 0,
+      dead: false,
+      stunUntil: 0,
+      displacement: null,
+      cooldownEnds: {},
+      cooldownTotals: {},
+      nextAttack: 'attack1',
+      lastAttackAt: 0,
+      sendLockUntil: 0
     });
   }
 
   updatePlayer(playerId, playerData) {
     const player = this.players.get(playerId);
     if (!player) {
-      const queuedEntry = this.pendingPlayers.find((p) => p.playerId === playerId);
-      if (queuedEntry) {
-        queuedEntry.playerData = { ...queuedEntry.playerData, ...playerData };
-      }
+      const queued = this.pendingPlayers.get(playerId);
+      if (queued) queued.playerData = { ...queued.playerData, ...playerData };
       return;
     }
 
@@ -351,6 +346,8 @@ export class GameScene {
     // The current player's position is driven locally by WASD input (see updateLocalMovement);
     // applying the server echo here would fight local prediction and cause jitter.
     if (player.isCurrentPlayer) return;
+    // A knockback / dash animation is moving this player right now
+    if (player.displacement) return;
 
     const dx = playerData.position.x - player.mesh.position.x;
     const dz = playerData.position.z - player.mesh.position.z;
@@ -370,23 +367,16 @@ export class GameScene {
     const player = this.players.get(playerId);
     if (player) {
       this.scene.remove(player.mesh);
+      player.actor.dispose();
       this.players.delete(playerId);
     }
-    this.pendingPlayers = this.pendingPlayers.filter((p) => p.playerId !== playerId);
+    this.pendingPlayers.delete(playerId);
   }
 
   setPlayerMoving(player, isMoving) {
     if (player.isMoving === isMoving) return;
     player.isMoving = isMoving;
-
-    const nextAction = isMoving ? player.actions.run : player.actions.idle;
-    if (!nextAction || player.currentAction === nextAction) return;
-
-    nextAction.reset().fadeIn(0.2).play();
-    if (player.currentAction) {
-      player.currentAction.fadeOut(0.2);
-    }
-    player.currentAction = nextAction;
+    player.actor.setMoving(isMoving);
   }
 
   getCurrentPlayerEntry() {
@@ -394,6 +384,10 @@ export class GameScene {
       if (player.isCurrentPlayer) return player;
     }
     return null;
+  }
+
+  isStunned(player) {
+    return performance.now() < player.stunUntil;
   }
 
   // Sends the local player's final position once movement stops, so remote clients
@@ -418,6 +412,11 @@ export class GameScene {
   updateLocalMovement(delta) {
     const player = this.getCurrentPlayerEntry();
     if (!player) return;
+
+    if (player.dead || player.displacement || this.isStunned(player)) {
+      this.setPlayerMoving(player, false);
+      return;
+    }
 
     const { w, a, s, d } = this.keys;
     if (!w && !a && !s && !d) {
@@ -460,61 +459,244 @@ export class GameScene {
     this.roomCode = roomCode;
   }
 
+  // ---------------------------------------------------------------------------
+  // Combat: attacks, skills and emotes
+  // ---------------------------------------------------------------------------
+
+  // Direction (on the ground plane) from the local player towards the mouse cursor.
+  getAimDirection(player) {
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const point = new THREE.Vector3();
+    if (this.raycaster.ray.intersectPlane(this.groundPlane, point)) {
+      const dx = point.x - player.mesh.position.x;
+      const dz = point.z - player.mesh.position.z;
+      const length = Math.hypot(dx, dz);
+      if (length > 0.5) return { x: dx / length, z: dz / length };
+    }
+    const facing = player.model.rotation.y;
+    return { x: Math.sin(facing), z: Math.cos(facing) };
+  }
+
+  /**
+   * Local player input: 'attack' (alternates attack1/attack2 as a combo), 'skill1'-'skill3' or 'emote'.
+   * In a room the request goes to the server, which validates it and broadcasts `skillUsed`;
+   * in the offline map preview it plays immediately without damage.
+   */
+  performAction(request) {
+    const me = this.getCurrentPlayerEntry();
+    const now = performance.now();
+    if (!me || me.dead || this.isStunned(me) || me.displacement || now < me.sendLockUntil) return;
+
+    let slot = request;
+    if (request === 'attack') {
+      const combo = me.nextAttack === 'attack2' && now - me.lastAttackAt < COMBO_WINDOW_SECONDS * 1000;
+      slot = combo ? 'attack2' : 'attack1';
+    }
+
+    const def = getActionDef(me.role, slot);
+    if (!def || (me.cooldownEnds[slot] || 0) > now) return;
+
+    const networked = Boolean(this.socketService && this.roomCode);
+    if (networked && (me.data.mana ?? Infinity) < getManaCost(me.role, slot)) return;
+
+    me.sendLockUntil = now + SEND_LOCK_MS;
+    const dir = this.getAimDirection(me);
+
+    if (networked) {
+      this.socketService.emit('useSkill', { roomCode: this.roomCode, slot, dir });
+      return;
+    }
+
+    const event = { casterId: me.playerId, slot, dir, hits: [], casterPosition: null };
+    if (def.dash) {
+      event.casterPosition = {
+        x: THREE.MathUtils.clamp(me.mesh.position.x + dir.x * def.dash, -this.arenaLimit, this.arenaLimit),
+        z: THREE.MathUtils.clamp(me.mesh.position.z + dir.z * def.dash, -this.arenaLimit, this.arenaLimit)
+      };
+    }
+    this.handleSkillUsed(event);
+  }
+
+  // Server broadcast: someone attacked / cast a skill / emoted.
+  handleSkillUsed(event) {
+    const caster = this.players.get(event.casterId);
+    const now = performance.now();
+
+    if (caster) {
+      const def = getActionDef(caster.role, event.slot);
+      caster.model.rotation.y = Math.atan2(event.dir.x, event.dir.z);
+      caster.actor.play(event.slot);
+
+      if (def) {
+        caster.cooldownEnds[event.slot] = now + def.cooldown * 1000;
+        caster.cooldownTotals[event.slot] = def.cooldown * 1000;
+      }
+      if (event.slot === 'attack1') {
+        caster.nextAttack = 'attack2';
+        caster.lastAttackAt = now;
+      } else if (event.slot === 'attack2') {
+        caster.nextAttack = 'attack1';
+      }
+
+      const effectId = this.getEffectId(caster, event.slot, def);
+      if (def && effectId) {
+        this.effects.spawn(effectId, {
+          position: caster.mesh.position,
+          rotationY: caster.model.rotation.y,
+          range: def.range,
+          shape: def.shape,
+          model: caster.model
+        });
+      }
+      if (def?.heal) this.spawnFloater(caster.mesh.position, `+${def.heal}`, '#7dff9c');
+      if (event.casterPosition) this.displace(caster, event.casterPosition, DASH_SECONDS);
+    }
+
+    event.hits.forEach((hit) => this.applyHit(hit));
+  }
+
+  // Skills use the effect picked in the character generator; basic attacks get a light default one.
+  getEffectId(caster, slot, def) {
+    const chosen = caster.def.effects?.[slot];
+    if (chosen) return chosen === 'none' ? null : chosen;
+    if (slot === 'attack1' || slot === 'attack2') {
+      if (def?.shape === 'cone') return 'slashArc';
+      if (def?.shape === 'line') return 'arrowVolley';
+    }
+    return null;
+  }
+
+  applyHit(hit) {
+    const target = this.players.get(hit.targetId);
+    if (!target) return;
+
+    target.data = { ...target.data, health: hit.health };
+    this.spawnFloater(target.mesh.position, `-${hit.damage}`, '#ff6b6b');
+
+    if (!target.actor.play(hit.reaction)) target.actor.play('hit');
+    if (hit.reaction !== 'hit') this.displace(target, hit.position, KNOCKBACK_SECONDS, KNOCKBACK_STUN_MS);
+  }
+
+  // Smoothly slides a player to `to`; the local player can't walk while it happens.
+  displace(player, to, seconds, stunMs = seconds * 1000) {
+    player.displacement = {
+      from: player.mesh.position.clone(),
+      to: new THREE.Vector3(to.x, 0, to.z),
+      elapsed: 0,
+      duration: seconds
+    };
+    if (player.isCurrentPlayer) player.stunUntil = Math.max(player.stunUntil, performance.now() + stunMs);
+  }
+
+  updateDisplacements(delta) {
+    for (const player of this.players.values()) {
+      const move = player.displacement;
+      if (!move) continue;
+      move.elapsed += delta;
+      const u = Math.min(1, move.elapsed / move.duration);
+      player.mesh.position.lerpVectors(move.from, move.to, 1 - (1 - u) ** 3);
+      if (u >= 1) {
+        player.displacement = null;
+        if (player.isCurrentPlayer) this.emitPosition(player.mesh.position.x, player.mesh.position.z);
+      }
+    }
+  }
+
+  handlePlayerDied(playerId) {
+    const player = this.players.get(playerId);
+    if (!player) return;
+    player.dead = true;
+    player.displacement = null;
+    player.data = { ...player.data, health: 0 };
+    player.mesh.visible = false;
+  }
+
+  handlePlayerRespawned(data) {
+    const player = this.players.get(data.id);
+    if (!player) return;
+    player.dead = false;
+    player.displacement = null;
+    player.stunUntil = 0;
+    player.cooldownEnds = {};
+    player.data = { ...player.data, ...data };
+    player.actor.endOneShot();
+    player.mesh.position.set(data.position.x, 0, data.position.z);
+    player.mesh.visible = true;
+    if (player.isCurrentPlayer) {
+      this.cameraSnapPending = true;
+      this.networkSyncTimer = 0;
+    }
+  }
+
+  spawnFloater(position, text, color) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 160;
+    canvas.height = 80;
+    const ctx = canvas.getContext('2d');
+    ctx.font = 'bold 52px Arial';
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 8;
+    ctx.strokeStyle = '#000';
+    ctx.strokeText(text, 80, 56);
+    ctx.fillStyle = color;
+    ctx.fillText(text, 80, 56);
+
+    const material = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, depthTest: false });
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(5, 2.5, 1);
+    sprite.position.set(position.x, 6, position.z);
+    sprite.renderOrder = 10;
+    this.scene.add(sprite);
+    this.floaters.push({ sprite, age: 0 });
+  }
+
+  updateFloaters(delta) {
+    for (let i = this.floaters.length - 1; i >= 0; i--) {
+      const floater = this.floaters[i];
+      floater.age += delta;
+      floater.sprite.position.y += 3 * delta;
+      floater.sprite.material.opacity = Math.max(0, 1 - floater.age);
+      if (floater.age >= 1) this.removeFloater(i);
+    }
+  }
+
+  removeFloater(index) {
+    const [{ sprite }] = this.floaters.splice(index, 1);
+    this.scene.remove(sprite);
+    sprite.material.map.dispose();
+    sprite.material.dispose();
+  }
+
+  // Snapshot for the skill bar: cooldown progress of the local player's actions.
+  getHudState() {
+    const me = this.getCurrentPlayerEntry();
+    if (!me) return null;
+    const now = performance.now();
+    const cooldowns = {};
+    Object.keys(me.cooldownEnds).forEach((slot) => {
+      const remaining = Math.max(0, me.cooldownEnds[slot] - now);
+      if (remaining > 0) cooldowns[slot] = { remaining, total: me.cooldownTotals[slot] };
+    });
+    return { role: me.role, dead: me.dead, mana: this.socketService ? me.data.mana : null, cooldowns };
+  }
+
+  // ---------------------------------------------------------------------------
+
   setupEventListeners() {
-    this.onClick = (e) => this.onMouseClick(e);
-    this.onMove = (e) => this.onMouseMove(e);
-    this.container.addEventListener('click', this.onClick);
+    this.onMouseDown = (e) => {
+      if (e.button !== 0) return;
+      this.updateMouse(e);
+      this.performAction('attack');
+    };
+    this.onMove = (e) => this.updateMouse(e);
+    this.container.addEventListener('mousedown', this.onMouseDown);
     this.container.addEventListener('mousemove', this.onMove);
   }
 
-  onMouseClick(event) {
-    // Movement is handled via WASD (see updateLocalMovement); clicking only selects a player.
+  updateMouse(event) {
     const rect = this.container.getBoundingClientRect();
     this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-    this.raycaster.setFromCamera(this.mouse, this.camera);
-
-    const playerGroups = Array.from(this.players.values()).map(p => p.mesh);
-    const intersects = this.raycaster.intersectObjects(playerGroups, true);
-
-    if (intersects.length > 0) {
-      // Walk up from the hit mesh to the player's group, which carries the playerId
-      let hitObject = intersects[0].object;
-      while (hitObject && hitObject.userData.playerId === undefined) {
-        hitObject = hitObject.parent;
-      }
-      if (hitObject) {
-        this.selectPlayer(hitObject.userData.playerId);
-      }
-    }
-  }
-
-  onMouseMove(event) {
-    const rect = this.container.getBoundingClientRect();
-    this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-  }
-
-  selectPlayer(playerId) {
-    // Remove previous selection highlight
-    if (this.selectedPlayer && this.players.has(this.selectedPlayer)) {
-      this.setHighlight(this.players.get(this.selectedPlayer), false);
-    }
-
-    // Add selection highlight
-    if (this.players.has(playerId)) {
-      this.setHighlight(this.players.get(playerId), true);
-      this.selectedPlayer = playerId;
-    }
-  }
-
-  setHighlight(player, isHighlighted) {
-    player.model.traverse((child) => {
-      if (child.isMesh && child.material && child.material.emissive) {
-        child.material.emissive.setHex(isHighlighted ? 0x444444 : 0x000000);
-      }
-    });
   }
 
   onWindowResize() {
@@ -551,6 +733,7 @@ export class GameScene {
 
     const delta = this.clock.getDelta();
     this.updateLocalMovement(delta);
+    this.updateDisplacements(delta);
     this.mapObjects.forEach((object) => object.update(delta));
     const now = performance.now();
     for (const player of this.players.values()) {
@@ -559,8 +742,10 @@ export class GameScene {
       if (!player.isCurrentPlayer && player.isMoving && now - player.lastMoveTime > REMOTE_IDLE_TIMEOUT_MS) {
         this.setPlayerMoving(player, false);
       }
-      player.mixer.update(delta);
+      player.actor.update(delta);
     }
+    this.effects.update(delta);
+    this.updateFloaters(delta);
 
     this.updateCamera(delta);
     this.environment.update(delta, this.cameraFocus);
@@ -568,13 +753,17 @@ export class GameScene {
   };
 
   dispose() {
+    this.disposed = true;
     cancelAnimationFrame(this.frameId);
     this.environment.dispose();
-    this.container.removeEventListener('click', this.onClick);
+    this.container.removeEventListener('mousedown', this.onMouseDown);
     this.container.removeEventListener('mousemove', this.onMove);
     window.removeEventListener('resize', this.onResize);
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
+    this.effects.dispose();
+    while (this.floaters.length) this.removeFloater(this.floaters.length - 1);
+    this.players.forEach((player) => player.actor.dispose());
     this.clearMapObjects();
     this.renderer.dispose();
     if (this.container.contains(this.renderer.domElement)) {

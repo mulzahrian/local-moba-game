@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MapEditorScene, DEFAULT_MAP_SIZE } from '../../map/MapEditorScene.js';
 import { SKY_OPTIONS, WEATHER_OPTIONS, DEFAULT_SKY, DEFAULT_WEATHER } from '../../map/environment.js';
 import {
@@ -11,6 +11,8 @@ import {
 import { mapApi } from '../../map/mapApi.js';
 import { GameScene } from '../../scenes/GameScene.js';
 import { CategoryIcon, CameraIcon } from './FantasyIcons.jsx';
+import { CharacterPicker } from '../character/CharacterPicker.jsx';
+import { SkillBar } from '../SkillBar.jsx';
 import { useT } from '../../i18n/index.js';
 import { useSettingsStore } from '../../store/settingsStore.js';
 import '../../styles/MapEditor.css';
@@ -90,6 +92,10 @@ export function MapEditor({ mapId, onExit }) {
   const [animationNames, setAnimationNames] = useState([]);
   const [previewMap, setPreviewMap] = useState(null);
   const previewRef = useRef(null);
+  const previewGameRef = useRef(null);
+  const [pickingCharacter, setPickingCharacter] = useState(false);
+  const characterId = useSettingsStore((s) => s.characterId);
+  const setCharacterId = useSettingsStore((s) => s.setCharacterId);
 
   const categories = getCategories();
   const definitions = useMemo(() => getObjectDefinitions(), []);
@@ -220,12 +226,20 @@ export function MapEditor({ mapId, onExit }) {
 
   const updateSelected = (patch) => scene().updateSelected(patch);
 
+  // The preview asks for a character first, then runs the map with it.
   const startPreview = () => {
     scene().select(null);
     scene().setPlacingType(null);
-    scene().setPaused(true);
-    setPreviewMap({ size, sky, weather, objects: scene().getObjects() });
+    setPickingCharacter(true);
   };
+
+  const beginPreview = () => {
+    setPickingCharacter(false);
+    scene().setPaused(true);
+    setPreviewMap({ size, sky, weather, objects: scene().getObjects(), characterId });
+  };
+
+  const getPreviewScene = useCallback(() => previewGameRef.current, []);
 
   const stopPreview = () => {
     setPreviewMap(null);
@@ -235,11 +249,18 @@ export function MapEditor({ mapId, onExit }) {
   useEffect(() => {
     if (!previewMap || !previewRef.current) return undefined;
     const game = new GameScene(previewRef.current);
+    previewGameRef.current = game;
     game.loadMap(previewMap);
     const spawn = previewMap.size * 0.4;
     game.addPlayer(
       'preview',
-      { id: 'preview', name: t('editor.previewPlayer'), team: 'team1', position: { x: -spawn, z: -spawn } },
+      {
+        id: 'preview',
+        name: t('editor.previewPlayer'),
+        team: 'team1',
+        characterId: previewMap.characterId,
+        position: { x: -spawn, z: -spawn }
+      },
       true
     );
     const onKey = (e) => {
@@ -248,6 +269,7 @@ export function MapEditor({ mapId, onExit }) {
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
+      previewGameRef.current = null;
       game.dispose();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -426,6 +448,21 @@ export function MapEditor({ mapId, onExit }) {
             <span className="editor-preview-hint">{t('editor.previewHelp')}</span>
           </div>
           <div className="editor-preview-stage" ref={previewRef} />
+          <SkillBar getScene={getPreviewScene} />
+        </div>
+      )}
+
+      {pickingCharacter && (
+        <div className="editor-preview ce-pick-overlay">
+          <div className="ce-pick-panel">
+            <h2 className="ce-heading">{t('pick.title')}</h2>
+            <p className="ed-hint">{t('pick.hint')}</p>
+            <CharacterPicker value={characterId} onChange={setCharacterId} />
+            <div className="ce-pick-actions">
+              <button className="ed-btn" onClick={() => setPickingCharacter(false)}>{t('common.cancel')}</button>
+              <button className="ed-btn primary" disabled={!characterId} onClick={beginPreview}>? {t('pick.confirm')}</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

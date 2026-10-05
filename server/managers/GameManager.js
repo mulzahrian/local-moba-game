@@ -1,10 +1,65 @@
+import { MANA_REGEN_PER_SECOND, RESPAWN_SECONDS, getRoleConfig } from '../../shared/characterConfig.js';
+
+// Builds a fresh in-room player for the chosen character (role decides health and mana pools).
+function createPlayer(id, name, team, position, character) {
+  const { maxHealth, maxMana } = getRoleConfig(character.role);
+  return {
+    id,
+    name,
+    position,
+    spawn: { ...position },
+    team,
+    characterId: character.id,
+    role: character.role,
+    health: maxHealth,
+    maxHealth,
+    mana: maxMana,
+    maxMana,
+    level: 1,
+    experience: 0,
+    dead: false,
+    cooldowns: {}
+  };
+}
+
 class GameManager {
   constructor(io) {
     this.io = io;
     this.rooms = new Map();
+    this.manaTimer = setInterval(() => this.regenerateMana(), 1000);
   }
 
-  createRoom(roomCode, hostId, hostName, map = null, environment = null) {
+  regenerateMana() {
+    for (const [roomCode, room] of this.rooms) {
+      const changed = [];
+      room.players.forEach((player) => {
+        if (player.dead || player.mana >= player.maxMana) return;
+        player.mana = Math.min(player.maxMana, player.mana + MANA_REGEN_PER_SECOND);
+        changed.push({ id: player.id, health: player.health, mana: player.mana });
+      });
+      if (changed.length) this.io.to(roomCode).emit('statsUpdated', { stats: changed });
+    }
+  }
+
+  // Marks a player dead and brings them back at their spawn point after a short delay.
+  scheduleRespawn(roomCode, playerId) {
+    const room = this.rooms.get(roomCode);
+    const player = room?.players.find((p) => p.id === playerId);
+    if (!player) return;
+    player.dead = true;
+    setTimeout(() => {
+      const current = this.rooms.get(roomCode)?.players.find((p) => p.id === playerId);
+      if (!current) return;
+      current.dead = false;
+      current.health = current.maxHealth;
+      current.mana = current.maxMana;
+      current.position = { ...current.spawn };
+      current.cooldowns = {};
+      this.io.to(roomCode).emit('playerRespawned', { player: current });
+    }, RESPAWN_SECONDS * 1000);
+  }
+
+  createRoom(roomCode, hostId, hostName, map = null, environment = null, character) {
     console.log(`  [GameManager] Creating room with code: "${roomCode}"`);
     
     if (this.rooms.has(roomCode)) {
@@ -15,18 +70,8 @@ class GameManager {
     const room = {
       code: roomCode,
       hostId: hostId,
-      players: [
-        {
-          id: hostId,
-          name: hostName,
-          position: { x: 0, y: 0, z: 0 },
-          team: 'team1',
-          health: 100,
-          mana: 100,
-          level: 1,
-          experience: 0
-        }
-      ],
+      players: [createPlayer(hostId, hostName, 'team1', { x: 0, y: 0, z: 0 }, character)],
+
       map, // full map JSON chosen by the host (null = default arena)
       environment, // { sky, weather } chosen by the host
       gameState: 'waiting', // waiting, starting, in_progress, finished
@@ -41,7 +86,7 @@ class GameManager {
     return room;
   }
 
-  joinRoom(roomCode, playerId, playerName) {
+  joinRoom(roomCode, playerId, playerName, character) {
     console.log(`  [GameManager] Looking up room with code: "${roomCode}"`);
     console.log(`  [GameManager] Rooms in storage: ${Array.from(this.rooms.keys()).join(", ") || "NONE"}`);
     
@@ -62,16 +107,8 @@ class GameManager {
     // Determine team
     const team = room.players.some(p => p.team === 'team1') ? 'team2' : 'team1';
 
-    const newPlayer = {
-      id: playerId,
-      name: playerName,
-      position: { x: team === 'team1' ? -50 : 50, y: 0, z: -50 },
-      team: team,
-      health: 100,
-      mana: 100,
-      level: 1,
-      experience: 0
-    };
+    const newPlayer = createPlayer(playerId, playerName, team, { x: team === 'team1' ? -50 : 50, y: 0, z: -50 }, character);
+
 
     room.players.push(newPlayer);
     console.log(`  [GameManager] ✅ Player added. Room now: ${room.players.length}/${room.maxPlayers}`);
