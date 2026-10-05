@@ -6,8 +6,12 @@ import { MapObject } from '../map/mapAssets.js';
 
 const ANIM_IDLE = 'lml_anim_idle';
 const ANIM_RUN = 'lml_anim_run';
-const CHARACTER_SCALE = 6;
-const MOVE_SPEED = 45; // units per second
+const CHARACTER_SCALE = 6 * 0.25; // characters are drawn at 0.25x relative to the map
+const UNIT_SCALE = CHARACTER_SCALE / 6; // applied to character-attached helpers (ring, label)
+const MOVE_SPEED = 45 * UNIT_SCALE; // units per second, scaled with the character
+const CAMERA_FOV = 60;
+const CAMERA_OFFSET = new THREE.Vector3(23, 35, 35); // follow-camera offset from the focus point
+const CAMERA_FOLLOW_SMOOTHING = 8; // higher = camera catches up faster
 const DEFAULT_ARENA_SIZE = 500;
 const NETWORK_SYNC_INTERVAL = 0.05; // seconds between position broadcasts (20Hz)
 const MOVE_EPSILON_SQ = 0.0005; // squared distance threshold to consider a remote player "moving"
@@ -18,7 +22,7 @@ export class GameScene {
     this.container = container;
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(
-      75,
+      CAMERA_FOV,
       container.clientWidth / container.clientHeight,
       0.1,
       1000
@@ -45,6 +49,8 @@ export class GameScene {
     this.keys = { w: false, a: false, s: false, d: false };
     this.clock = new THREE.Clock();
     this.networkSyncTimer = 0;
+    this.cameraFocus = new THREE.Vector3();
+    this.cameraSnapPending = true;
 
     // Character model (shared template, cloned per player once loaded)
     this.characterTemplate = null;
@@ -103,8 +109,8 @@ export class GameScene {
 
   setupScene() {
     this.scene.background = new THREE.Color(0x0a0a0a);
-    // Camera positioned for better isometric-like view of larger map
-    this.camera.position.set(100, 150, 150);
+    // MOBA-style fixed-angle camera; updateCamera() keeps it centred on the local player.
+    this.camera.position.copy(CAMERA_OFFSET);
     this.camera.lookAt(0, 0, 0);
 
     // Precompute camera-relative movement axes (flattened to the ground plane)
@@ -127,7 +133,11 @@ export class GameScene {
     directionalLight.castShadow = true;
     directionalLight.shadow.mapSize.width = 2048;
     directionalLight.shadow.mapSize.height = 2048;
+    // The shadow frustum only covers the area around the followed player (see updateCamera).
+    Object.assign(directionalLight.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 300 });
     this.scene.add(directionalLight);
+    this.scene.add(directionalLight.target);
+    this.sunLight = directionalLight;
   }
 
   setupBoard(size = DEFAULT_ARENA_SIZE, groundColor = 0x1a3a1a) {
@@ -260,7 +270,7 @@ export class GameScene {
     const teamColor = playerData.team === 'team1' ? 0xff6b6b : 0x4ecdc4;
 
     // Team-colored ring under the character's feet (keeps the character's own textures intact)
-    const ringGeometry = new THREE.RingGeometry(4, 5.5, 32);
+    const ringGeometry = new THREE.RingGeometry(4 * UNIT_SCALE, 5.5 * UNIT_SCALE, 32);
     const ringMaterial = new THREE.MeshBasicMaterial({
       color: teamColor,
       side: THREE.DoubleSide,
@@ -269,7 +279,7 @@ export class GameScene {
     });
     const ring = new THREE.Mesh(ringGeometry, ringMaterial);
     ring.rotation.x = -Math.PI / 2;
-    ring.position.y = 0.2;
+    ring.position.y = 0.05;
 
     // Name label
     const canvas = document.createElement('canvas');
@@ -282,10 +292,10 @@ export class GameScene {
     ctx.fillText(playerData.name, 128, 45);
 
     const texture = new THREE.CanvasTexture(canvas);
-    const labelGeometry = new THREE.PlaneGeometry(8, 2);
+    const labelGeometry = new THREE.PlaneGeometry(4, 1);
     const labelMaterial = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
     const label = new THREE.Mesh(labelGeometry, labelMaterial);
-    label.position.y = 17;
+    label.position.y = 17 * UNIT_SCALE;
 
     // Group holds everything at the world position; only `model` rotates to face movement,
     // keeping the ring and name label upright/non-rotated.
@@ -513,6 +523,26 @@ export class GameScene {
     this.renderer.setSize(width, height);
   }
 
+  // Smoothly keeps the camera (and the sun's shadow frustum) centred on the local player.
+  updateCamera(delta) {
+    const player = this.getCurrentPlayerEntry();
+    if (!player) return;
+
+    const target = player.mesh.position;
+    if (this.cameraSnapPending) {
+      this.cameraFocus.copy(target);
+      this.cameraSnapPending = false;
+    } else {
+      this.cameraFocus.lerp(target, 1 - Math.exp(-CAMERA_FOLLOW_SMOOTHING * delta));
+    }
+
+    this.camera.position.copy(this.cameraFocus).add(CAMERA_OFFSET);
+    this.camera.lookAt(this.cameraFocus);
+
+    this.sunLight.position.copy(this.cameraFocus).add(new THREE.Vector3(50, 100, 50));
+    this.sunLight.target.position.copy(this.cameraFocus);
+  }
+
   animate = () => {
     this.frameId = requestAnimationFrame(this.animate);
 
@@ -529,6 +559,7 @@ export class GameScene {
       player.mixer.update(delta);
     }
 
+    this.updateCamera(delta);
     this.renderer.render(this.scene, this.camera);
   };
 
