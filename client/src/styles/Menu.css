@@ -496,3 +496,109 @@
   color: #b09560;
   animation: pulse 1.5s ease-in-out infinite;
 }
+
+/* ===== Magic circle loader ===== */
+.magic-loader {
+  position: relative;
+  width: 160px;
+  height: 160px;
+  margin: 18px auto 10px;
+}
+
+.magic-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 50%;
+}
+
+.ring-outer {
+  width: 0;
+  height: 0;
+  animation: magic-spin 14s linear infinite;
+}
+
+.magic-rune {
+  position: absolute;
+  left: -8px;
+  top: -10px;
+  width: 16px;
+  text-align: center;
+  font-size: 16px;
+  line-height: 20px;
+  color: #ffd98a;
+  text-shadow: 0 0 8px rgba(255, 160, 50, 0.95);
+}
+
+.ring-mid {
+  width: 118px;
+  height: 118px;
+  margin: -59px 0 0 -59px;
+  border: 2px dashed #e0a23c;
+  box-shadow: 0 0 14px rgba(255, 150, 40, 0.55), inset 0 0 14px rgba(255, 150, 40, 0.35);
+  animation: magic-spin 8s linear infinite reverse;
+}
+
+.ring-star {
+  width: 96px;
+  height: 96px;
+  margin: -48px 0 0 -48px;
+  fill: none;
+  stroke: #ffcf70;
+  stroke-width: 1.4;
+  filter: drop-shadow(0 0 4px rgba(255, 170, 60, 0.9));
+  animation: magic-spin 5s linear infinite;
+}
+
+.ring-inner {
+  width: 54px;
+  height: 54px;
+  margin: -27px 0 0 -27px;
+  border: 2px solid transparent;
+  border-top-color: #fff0b8;
+  border-bottom-color: #ff8a3c;
+  animation: magic-spin 1.6s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+}
+
+.magic-core {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff6d0 0%, #ffb347 55%, rgba(255, 120, 20, 0) 100%);
+  box-shadow: 0 0 22px 8px rgba(255, 150, 40, 0.7);
+  animation: magic-glow 1.8s ease-in-out infinite;
+}
+
+.magic-orbit {
+  position: absolute;
+  inset: 0;
+  animation: magic-spin 3s linear infinite;
+}
+
+.magic-orbit i {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  border-radius: 50%;
+  background: #fff3c4;
+  box-shadow: 0 0 10px 3px rgba(255, 190, 80, 0.95);
+}
+
+.magic-orbit.orbit-b { animation-duration: 4.5s; animation-direction: reverse; transform: scale(0.8); }
+.magic-orbit.orbit-c { animation-duration: 6s; transform: scale(0.6); }
+
+@keyframes magic-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes magic-glow {
+  0%, 100% { transform: scale(0.8); opacity: 0.75; }
+  50% { transform: scale(1.25); opacity: 1; }
+}

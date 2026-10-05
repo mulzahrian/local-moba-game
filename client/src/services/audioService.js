@@ -1,43 +1,62 @@
 import menuMusicUrl from '../music/main-menu.mp3';
+import loadingMusicUrl from '../music/loading.mp3';
+import buttonClickUrl from '../music/button-click.mp3';
 
-// Browsers block autoplay until the user interacts, so playback is retried on the first gesture.
+const UNLOCK_EVENTS = ['pointerdown', 'pointerup', 'click', 'keydown', 'touchend'];
+
+// Browsers block autoplay until the user interacts, so playback is attempted
+// immediately on load and retried on the first gesture if it was blocked.
 class AudioService {
   constructor() {
-    this.audio = null;
+    this.tracks = {
+      menu: this.createTrack(menuMusicUrl, 0.5),
+      loading: this.createTrack(loadingMusicUrl, 0.6),
+    };
+    this.clickAudio = new Audio(buttonClickUrl);
+    this.clickAudio.volume = 0.7;
     this.enabled = true;
-    this.wanted = false; // whether menu music should currently be playing
+    this.current = null; // 'menu' | 'loading' | null
     this.unlockBound = false;
+    this.unlock = this.unlock.bind(this);
   }
 
-  ensureAudio() {
-    if (!this.audio) {
-      this.audio = new Audio(menuMusicUrl);
-      this.audio.loop = true;
-      this.audio.volume = 0.5;
-    }
-    return this.audio;
+  createTrack(url, volume) {
+    const audio = new Audio(url);
+    audio.loop = true;
+    audio.volume = volume;
+    audio.preload = 'auto';
+    return audio;
   }
 
   bindUnlock() {
     if (this.unlockBound) return;
     this.unlockBound = true;
-    const unlock = () => {
-      this.sync();
-      window.removeEventListener('pointerdown', unlock);
-      window.removeEventListener('keydown', unlock);
-      this.unlockBound = false;
-    };
-    window.addEventListener('pointerdown', unlock);
-    window.addEventListener('keydown', unlock);
+    UNLOCK_EVENTS.forEach((e) => window.addEventListener(e, this.unlock, true));
+  }
+
+  unbindUnlock() {
+    if (!this.unlockBound) return;
+    this.unlockBound = false;
+    UNLOCK_EVENTS.forEach((e) => window.removeEventListener(e, this.unlock, true));
+  }
+
+  // Stays bound until playback actually succeeds (some events are not activation gestures).
+  unlock() {
+    this.sync();
   }
 
   sync() {
-    const audio = this.ensureAudio();
-    if (this.enabled && this.wanted) {
-      audio.play().catch(() => this.bindUnlock());
-    } else {
-      audio.pause();
-    }
+    Object.entries(this.tracks).forEach(([name, audio]) => {
+      if (this.enabled && this.current === name) {
+        audio
+          .play()
+          .then(() => this.unbindUnlock())
+          .catch(() => this.bindUnlock());
+      } else {
+        audio.pause();
+        if (name !== this.current) audio.currentTime = 0;
+      }
+    });
   }
 
   setEnabled(enabled) {
@@ -45,10 +64,18 @@ class AudioService {
     this.sync();
   }
 
-  // `wanted` is true on menu screens and false while in a match.
-  setWanted(wanted) {
-    this.wanted = wanted;
+  // 'menu' on menu screens, 'loading' while waiting for the opponent, null during a match.
+  setTrack(name) {
+    if (this.current === name) return;
+    this.current = name;
     this.sync();
+  }
+
+  playClick() {
+    if (!this.enabled) return;
+    const sfx = this.clickAudio.cloneNode();
+    sfx.volume = this.clickAudio.volume;
+    sfx.play().catch(() => {});
   }
 }
 
