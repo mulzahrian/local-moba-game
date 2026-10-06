@@ -113,6 +113,17 @@ const Creature = () => (
   </Svg>
 );
 
+const Tower = () => (
+  <Svg defs={<>{gradient('fi-crystal', '#b8f3ff', '#2a8fd8')}{gradient('fi-base', '#c9c1b2', '#6f675a')}</>}>
+    <path d="M24 3 L31 12 L24 21 L17 12 Z" fill="url(#fi-crystal)" stroke={GOLD} strokeWidth="1.3" strokeLinejoin="round" />
+    <path d="M24 3 V21 M17 12 H31" stroke="#e8fbff" strokeWidth="0.8" opacity="0.7" />
+    <path d="M18 24 H30 L32 42 H16 Z" fill="url(#fi-base)" stroke={GOLD_DARK} strokeWidth="1" strokeLinejoin="round" />
+    <path d="M16 24 V21 H19 V24 M21 24 V21 H24 V24 M26 24 V21 H29 V24 M31 24 V21 H34 V24" fill="#8d8576" stroke={GOLD_DARK} strokeWidth="0.8" />
+    <path d="M22 42 V35 Q24 31 26 35 V42 Z" fill="#2a170a" stroke={GOLD} strokeWidth="1" />
+    <path d="M10 42 H38" stroke={GOLD_DARK} strokeWidth="2" strokeLinecap="round" />
+  </Svg>
+);
+
 const Fallback = () => (
   <Svg>
     <path d="M24 4 L40 16 L34 40 H14 L8 16 Z" fill="#5a2fb0" stroke={GOLD} strokeWidth="1.3" strokeLinejoin="round" />
@@ -126,7 +137,8 @@ const CATEGORY_ICONS = {
   props: Props,
   building: Building,
   animal: Animal,
-  creature: Creature
+  creature: Creature,
+  tower: Tower
 };
 
 export function CategoryIcon({ id }) {

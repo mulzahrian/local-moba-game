@@ -290,6 +290,8 @@
 .ed-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 
 .ed-count { margin-top: 18px; font-size: 12px; letter-spacing: 1px; color: #9a8250; }
+.ed-count + .ed-count { margin-top: 4px; }
+.ed-count-warn { color: #ff8a70; }
 
 .editor-help {
   padding: 6px 14px;

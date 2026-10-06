@@ -6,9 +6,18 @@
     { "id": "props", "icon": "🪨", "name": { "en": "Props", "id": "Properti" } },
     { "id": "building", "icon": "🏰", "name": { "en": "Buildings", "id": "Bangunan" } },
     { "id": "animal", "icon": "🐺", "name": { "en": "Animals", "id": "Hewan" } },
-    { "id": "creature", "icon": "👾", "name": { "en": "Creatures", "id": "Makhluk" } }
+    { "id": "creature", "icon": "👾", "name": { "en": "Creatures", "id": "Makhluk" } },
+    { "id": "tower", "icon": "🗼", "name": { "en": "Towers", "id": "Menara" } }
   ],
   "objects": [
+    {
+      "id": "tower",
+      "category": "tower",
+      "name": { "en": "Tower (base)", "id": "Menara (base)" },
+      "model": "map/tower/crystal_tower.glb",
+      "size": 20,
+      "defaultAnimation": "Armature|Up and Down"
+    },
     {
       "id": "rimuru_tempest",
       "category": "creature",

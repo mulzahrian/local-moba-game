@@ -4,7 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import { generateRoomCode } from '../shared/utils.js';
 import GameManager from './managers/GameManager.js';
-import mapStore, { sanitizeEnvironment } from './managers/MapStore.js';
+import mapStore, { MapValidationError, sanitizeEnvironment } from './managers/MapStore.js';
 import characterStore, {
   MAX_IMAGE_BYTES,
   MAX_MODEL_BYTES,
@@ -41,6 +41,9 @@ app.get('/health', (req, res) => {
 
 // Map API (maps are stored as JSON files in server/data/maps)
 const handleMapError = (res, error) => {
+  if (error instanceof MapValidationError) {
+    return res.status(400).json({ success: false, message: error.message });
+  }
   console.error('[MapAPI] Error:', error);
   res.status(500).json({ success: false, message: 'Server error' });
 };

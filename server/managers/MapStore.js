@@ -1,6 +1,9 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { REQUIRED_TOWERS, countTowers } from '../../shared/mapConfig.js';
+
+export class MapValidationError extends Error {}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MAPS_DIR = path.join(__dirname, '..', 'data', 'maps');
@@ -58,6 +61,14 @@ export function sanitizeMap(input, id, previous = null) {
   };
 }
 
+// Rejects maps that do not contain exactly REQUIRED_TOWERS towers.
+export function assertValidMap(map) {
+  const towers = countTowers(map.objects);
+  if (towers !== REQUIRED_TOWERS) {
+    throw new MapValidationError(`A map needs exactly ${REQUIRED_TOWERS} towers (found ${towers})`);
+  }
+}
+
 class MapStore {
   async ensureDir() {
     await fs.mkdir(MAPS_DIR, { recursive: true });
@@ -109,6 +120,7 @@ class MapStore {
       id = `${base}-${counter++}`;
     }
     const map = sanitizeMap(input, id);
+    assertValidMap(map);
     await fs.writeFile(this.filePath(id), JSON.stringify(map, null, 2));
     return map;
   }
@@ -117,6 +129,7 @@ class MapStore {
     const previous = await this.get(id);
     if (!previous) return null;
     const map = sanitizeMap(input, id, previous);
+    assertValidMap(map);
     await fs.writeFile(this.filePath(id), JSON.stringify(map, null, 2));
     return map;
   }

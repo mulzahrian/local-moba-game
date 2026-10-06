@@ -9,6 +9,7 @@ import {
   localizedName
 } from '../../map/mapAssets.js';
 import { mapApi } from '../../map/mapApi.js';
+import { REQUIRED_TOWERS, countTowers } from '../../../../shared/mapConfig.js';
 import { GameScene } from '../../scenes/GameScene.js';
 import { CategoryIcon, CameraIcon } from './FantasyIcons.jsx';
 import { CharacterPicker } from '../character/CharacterPicker.jsx';
@@ -101,6 +102,7 @@ export function MapEditor({ mapId, onExit }) {
   const definitions = useMemo(() => getObjectDefinitions(), []);
   const visibleDefinitions = definitions.filter((d) => d.category === category);
   const selected = objects.find((o) => o.uid === selectedUid) || null;
+  const towerCount = countTowers(objects);
   const activeType = selected?.type || placingType;
 
   useEffect(() => {
@@ -183,12 +185,18 @@ export function MapEditor({ mapId, onExit }) {
   };
 
   const save = async () => {
+    const objectsToSave = scene().getObjects();
+    const towers = countTowers(objectsToSave);
+    if (towers !== REQUIRED_TOWERS) {
+      setStatus({ type: 'error', text: t('editor.towerError', { required: REQUIRED_TOWERS, count: towers }) });
+      return;
+    }
     const payload = {
       name: name.trim() || t('editor.untitled'),
       size,
       sky,
       weather,
-      objects: scene().getObjects()
+      objects: objectsToSave
     };
     try {
       const map = savedId ? await mapApi.update(savedId, payload) : await mapApi.create(payload);
@@ -436,6 +444,9 @@ export function MapEditor({ mapId, onExit }) {
           {!selected && !placeSettings && <p className="ed-hint">{t('editor.nothingSelected')}</p>}
 
           <div className="ed-count">{t('editor.count', { count: objects.length })}</div>
+          <div className={`ed-count ${towerCount === REQUIRED_TOWERS ? '' : 'ed-count-warn'}`}>
+            {t('editor.towerCount', { count: towerCount, required: REQUIRED_TOWERS })}
+          </div>
         </aside>
       </div>
 
