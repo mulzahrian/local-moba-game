@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Fx, TAU, clamp01, easeOut, rand, registerEffects } from '../character/effects.js';
+import { SUMMON_EFFECT_LABELS, SUMMON_SOUND_EFFECT } from './summonEffects.js';
 
 /**
  * Visual effects of the skills made in the Skill Generator. They are built like the character effects
@@ -272,6 +273,7 @@ const SKILL_BUILDERS = {
 registerEffects(SKILL_BUILDERS);
 
 export const SKILL_EFFECT_LABELS = {
+  ...SUMMON_EFFECT_LABELS,
   smokeCloak: { en: 'Smoke Cloak', id: 'Jubah Asap' },
   ghostVeil: { en: 'Ghost Veil', id: 'Tabir Hantu' },
   lifeBloom: { en: 'Life Bloom', id: 'Mekar Kehidupan' },
@@ -288,6 +290,7 @@ export function skillEffectLabel(id, language) {
 
 // Sounds are shared with the character effects (the closest match for each power).
 export const SKILL_SOUND_EFFECT = {
+  ...SUMMON_SOUND_EFFECT,
   vanish: 'shadowVanish',
   heal: 'healingAura',
   control: 'magicCircle',

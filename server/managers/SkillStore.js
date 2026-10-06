@@ -41,9 +41,60 @@ const DEFAULT_SKILLS = [
   { name: 'Fireball', power: 'fire', effect: 'fireball', mana: 25, cooldown: 6, price: 400, params: { shape: 'line', range: 28, width: 3, damage: 35 } }
 ];
 
+// Skills of the summon powers (necromancer, summoner, support) installed next to the ones above; they use the bundled slime model.
+const SUMMON_SEED_ANIMATIONS = { idle: 'lml_anim_idle', run: 'lml_anim_run', attack1: 'lml_anim_atk01', dead: 'lml_anim_die' };
+const seedUnit = (id, name, power, scale, params) => ({
+  id,
+  name,
+  power,
+  animations: SUMMON_SEED_ANIMATIONS,
+  params: { scale, ...params }
+});
+const DEFAULT_SUMMON_SKILLS = [
+  {
+    name: 'Raise Dead',
+    power: 'necromancer',
+    effect: 'graveRise',
+    mana: 60,
+    cooldown: 30,
+    price: 1200,
+    params: { lifetime: 30 },
+    units: [
+      seedUnit('bone-fighter', 'Bone Fighter', 'melee', 0.8, { health: 90, amount: 9, speed: 10 }),
+      seedUnit('bone-archer', 'Bone Archer', 'ranged', 0.7, { health: 60, amount: 8 })
+    ]
+  },
+  {
+    name: 'Summon Guardian',
+    power: 'summoner',
+    effect: 'summonCircle',
+    mana: 70,
+    cooldown: 45,
+    price: 1500,
+    params: {},
+    units: [seedUnit('guardian', 'Guardian', 'melee', 1.4, { health: 300, amount: 16, range: 5, cooldown: 1.1 })]
+  },
+  {
+    name: 'Spirit Healer',
+    power: 'support',
+    effect: 'blessingHalo',
+    mana: 50,
+    cooldown: 35,
+    price: 1000,
+    params: { lifetime: 40 },
+    units: [seedUnit('healer', 'Spirit Healer', 'heal', 0.8, { health: 80, amount: 14 })]
+  }
+];
+const SUMMON_SEEDED_FILE = path.join(SKILLS_DIR, '.seeded-summons');
+const SEED_MODEL = path.join(__dirname, '..', 'seed', 'objects', 'creatures', 'rimuru_tempest.glb');
+
 class SkillStore {
   dir(id) {
     return path.join(SKILLS_DIR, id);
+  }
+
+  unitModelPath(skillId, unitId) {
+    return path.join(this.dir(skillId), 'units', `${unitId}.glb`);
   }
 
   jsonPath(id) {
@@ -93,7 +144,23 @@ class SkillStore {
   async update(id, input) {
     const previous = await this.get(id);
     if (!previous) return null;
-    return this.write(sanitizeSkill(input, id, previous));
+    const skill = sanitizeSkill(input, id, previous);
+    // units that were removed (or the whole skill changed to another power) lose their model files
+    const kept = new Set((skill.units || []).map((unit) => unit.id));
+    for (const unit of previous.units || []) {
+      if (!kept.has(unit.id)) await fs.rm(this.unitModelPath(id, unit.id), { force: true });
+    }
+    return this.write(skill);
+  }
+
+  async saveUnitModel(id, unitId, buffer) {
+    const skill = await this.get(id);
+    const unit = skill?.units?.find((candidate) => candidate.id === unitId);
+    if (!unit) return null;
+    await fs.mkdir(path.join(this.dir(id), 'units'), { recursive: true });
+    await fs.writeFile(this.unitModelPath(id, unitId), buffer);
+    unit.hasModel = true;
+    return this.write({ ...skill, updatedAt: new Date().toISOString() });
   }
 
   async saveIcon(id, buffer, ext) {
@@ -123,6 +190,23 @@ class SkillStore {
       await this.create({ ...skill, params: { ...defaultSkill(skill.power).params, ...skill.params } });
     }
     await fs.writeFile(SEEDED_FILE, new Date().toISOString());
+  }
+
+  // Same for the summon skills, which came later than the first set of defaults.
+  async seedSummonDefaults() {
+    await fs.mkdir(SKILLS_DIR, { recursive: true });
+    try {
+      await fs.access(SUMMON_SEEDED_FILE);
+      return;
+    } catch {
+      // not seeded yet
+    }
+    const model = await fs.readFile(SEED_MODEL).catch(() => null);
+    for (const input of DEFAULT_SUMMON_SKILLS) {
+      const skill = await this.create(input);
+      if (model) for (const unit of skill.units) await this.saveUnitModel(skill.id, unit.id, model);
+    }
+    await fs.writeFile(SUMMON_SEEDED_FILE, new Date().toISOString());
   }
 }
 

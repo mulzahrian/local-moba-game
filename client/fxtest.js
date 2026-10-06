@@ -1,0 +1,20 @@
+import * as THREE from 'three';
+import { EffectManager } from './src/character/effects.js';
+import { attackEffectId } from './src/character/attackEffects.js';
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x120d08);
+const cam = new THREE.PerspectiveCamera(45, 900/560, 0.1, 300);
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(900, 560);
+document.getElementById('c').appendChild(r.domElement);
+scene.add(new THREE.AmbientLight(0xffffff, 1));
+const floor = new THREE.Mesh(new THREE.CircleGeometry(30, 48), new THREE.MeshBasicMaterial({ color: 0x2a1f14 })); floor.rotation.x = -Math.PI/2; scene.add(floor);
+const dummy = new THREE.Mesh(new THREE.CapsuleGeometry(0.6, 1.8, 4, 8), new THREE.MeshBasicMaterial({ color: 0x66aa66 })); dummy.position.y = 1.5; scene.add(dummy);
+const fx = new EffectManager(scene);
+let params = new URLSearchParams(location.search);
+window.play = (id, range = 9, shape = 'circle', cx = 0, cy = 5, cz = 14, ty = 1.8, tz = 3) => {
+  cam.position.set(cx, cy, cz); cam.lookAt(0, ty, tz);
+  window.t = 0; window.frozen = false; window.stopAt = null;
+  fx.dispose(); fx.spawn(id, { position: {x:0,y:0,z:0}, range, shape });
+};
+window.attack = (type, slot, range = 9) => window.play(attackEffectId(type, slot), range, 'cone', 3, 4, 8, 1.5, 1);
+window.step = (t) => { for (let i = 0; i < Math.round(t/0.016); i++) fx.update(0.016); r.render(scene, cam); };
+window.ready = true;

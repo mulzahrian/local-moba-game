@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { MapObject } from '../map/mapAssets.js';
+import { PathWalker } from '../map/PathWalker.js';
+import { computeFootprint, resolveObstacles } from '../map/collision.js';
 import { Environment, createGroundGeometry, createGroundMaterial } from '../map/environment.js';
 import { BUILTIN_CHARACTER_ID, COMBO_WINDOW_SECONDS, getActionDef, getAttackType, getManaCost } from '../../../shared/characterConfig.js';
 import { CharacterActor } from '../character/CharacterActor.js';
@@ -8,9 +10,15 @@ import { RUN_SOUND, playActionSound, playPowerSound, playReactionSound } from '.
 import { buildTowers } from '../../../shared/mapConfig.js';
 import { audioService } from '../services/audioService.js';
 import { EffectManager } from '../character/effects.js';
+import { attackEffectId } from '../character/attackEffects.js';
 import { isSkillSlot, skillIdOfSlot, skillSlot } from '../../../shared/skillConfig.js';
-import { getSkillAction } from '../skill/skillLibrary.js';
+import { FLIGHT_HEIGHT, isMonsterObject, monsterIdOfType } from '../../../shared/monsterConfig.js';
+import { SHOP_OPEN_SECONDS, SHOP_RANGE } from '../../../shared/economyConfig.js';
+import { ensureSkillLibrary, getSkill, getSkillAction, refreshSkillLibrary } from '../skill/skillLibrary.js';
 import { SKILL_SOUND_EFFECT } from '../skill/skillEffects.js';
+import { SUMMON_SOUND_EFFECT } from '../skill/summonEffects.js';
+import { getMonsterDefinition } from '../monster/monsterAssets.js';
+import { WorldActor } from '../world/WorldActor.js';
 import { useSkillStore } from '../store/skillStore.js';
 
 const UNIT_SCALE = 0.25; // characters are drawn at 0.25x relative to the map; scales character-attached helpers
@@ -35,6 +43,9 @@ const KEY_ACTIONS = { KeyZ: 'skill1', KeyX: 'skill2', KeyC: 'skill3', KeyQ: 'emo
 const NO_REPEAT_ACTIONS = ['emote', 'jump'];
 const SKILL_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4']; // equipped skills (see skillStore)
 const GHOST_OPACITY = 0.35; // how visible an invisible player is to its own team
+const DOMINATED_SPEED_FACTOR = 0.7; // mind-controlled players are dragged along slower than they walk
+const DOMINATED_STOP_DISTANCE = 3;
+const MONSTER_BAR_COLOR = 0xd04a3a;
 
 const isTypingTarget = (target) =>
   target instanceof HTMLElement &&
@@ -56,12 +67,20 @@ export class GameScene {
     this.setupScene();
     this.setupLights();
     this.mapObjects = [];
+    this.footprints = []; // ground footprints of the solid map objects (see map/collision.js)
+    this.pathWalkers = []; // NPCs walking along the paths of the map
     this.towers = new Map(); // tower id -> { ...tower, root, ring, bar, canvas, color }
     this.gameOver = false;
     this.setupBoard();
 
     this.players = new Map();
     this.pendingPlayers = new Map(); // playerId -> { playerData, isCurrentPlayer } while the character model loads
+    this.monsters = new Map(); // map object uid -> WorldActor (guards placed on the map; the server moves them)
+    this.units = new Map(); // unit id -> WorldActor (summoned by skills)
+    this.defeatedEntities = new Set(); // ids that died while their model was still loading
+    this.pendingStates = new Map(); // id -> last server state received before the entity was created
+    this.mapVersion = 0;
+    this.startedAt = Date.now(); // the shop is open for the first minutes after this
     this.effects = new EffectManager(this.scene);
     this.floaters = []; // floating damage / heal numbers
     this.disposed = false;
@@ -201,6 +220,7 @@ export class GameScene {
   // Rebuilds the arena from a saved map (null keeps the default arena) and places its objects and towers.
   loadMap(map) {
     this.clearMapObjects();
+    this.clearWorld();
     this.clearTowers();
     const towers = buildTowers(map);
 
@@ -208,9 +228,26 @@ export class GameScene {
       this.setupBoard(map.size || DEFAULT_ARENA_SIZE, !towers[0].custom);
       this.environment.apply(map.sky, map.weather);
       (map.objects || []).forEach((data) => {
+        if (isMonsterObject(data)) {
+          this.addMonster(data);
+          return;
+        }
         const object = new MapObject(data);
         this.scene.add(object.root);
         this.mapObjects.push(object);
+        if (!data.noCollision) {
+          object.ready.then(() => {
+            if (object.disposed) return;
+            object.footprint = computeFootprint(object.root);
+            this.rebuildFootprints();
+          });
+        }
+      });
+      (map.paths || []).forEach((path) => {
+        if (!path.type || path.points?.length < 2) return;
+        const walker = new PathWalker(path);
+        this.scene.add(walker.root);
+        this.pathWalkers.push(walker);
       });
     }
     this.setupTowers(towers);
@@ -275,6 +312,11 @@ export class GameScene {
 
     if (!hit.destroyed) return;
     if (tower.root) tower.root.visible = false;
+    const fallen = this.mapObjects.find((object) => object.data.uid === tower.id);
+    if (fallen) {
+      fallen.footprint = null;
+      this.rebuildFootprints();
+    }
     tower.bar.visible = false;
     tower.ring.visible = false;
     const options = { position: { x: tower.position.x, y: 0, z: tower.position.z }, range: tower.radius * 2, shape: 'circle' };
@@ -302,14 +344,198 @@ export class GameScene {
     this.towers.clear();
   }
 
+  // ---------------------------------------------------------------------------
+  // Monsters and summoned units: the server runs their behaviour, the scene only draws them.
+  // ---------------------------------------------------------------------------
+
+  async addMonster(object) {
+    const version = this.mapVersion;
+    try {
+      const def = await getMonsterDefinition(monsterIdOfType(object.type));
+      if (!def.modelUrl) return;
+      const gltf = await loadGltf(def.modelUrl);
+      if (this.disposed || version !== this.mapVersion || this.monsters.has(object.uid) || this.defeatedEntities.has(object.uid)) return;
+
+      const actor = new WorldActor({
+        id: object.uid,
+        kind: 'monster',
+        gltf,
+        def,
+        position: object.position,
+        rotationY: THREE.MathUtils.degToRad(object.rotationY || 0),
+        scale: object.scale || 1,
+        hover: def.hover,
+        health: def.params.health,
+        maxHealth: def.params.health,
+        color: MONSTER_BAR_COLOR
+      });
+      actor.def = def;
+      this.scene.add(actor.group);
+      this.monsters.set(object.uid, actor);
+      const pending = this.pendingStates.get(object.uid);
+      if (pending) actor.setState(pending);
+    } catch (error) {
+      console.error('[GameScene] Failed to load monster:', error);
+    }
+  }
+
+  async addUnit(data) {
+    if (this.units.has(data.id)) return;
+    try {
+      await ensureSkillLibrary();
+      const findUnit = () => getSkill(data.skillId)?.units?.find((candidate) => candidate.id === data.unitId);
+      let unit = findUnit();
+      if (!unit) {
+        await refreshSkillLibrary(); // the skill may have been made after this client loaded the library
+        unit = findUnit();
+      }
+      if (!unit?.modelUrl) return;
+      const gltf = await loadGltf(unit.modelUrl);
+      if (this.disposed || this.units.has(data.id) || this.defeatedEntities.has(data.id)) return;
+
+      const color = TEAM_COLORS[data.team];
+      const actor = new WorldActor({
+        id: data.id,
+        kind: 'unit',
+        gltf,
+        def: { animations: unit.animations, scale: unit.params.scale },
+        position: data,
+        rotationY: data.r,
+        hover: unit.movement === 'flight' ? FLIGHT_HEIGHT : 0,
+        health: data.h,
+        maxHealth: data.maxHealth,
+        color,
+        ringColor: color
+      });
+      actor.unit = unit;
+      this.scene.add(actor.group);
+      this.units.set(data.id, actor);
+      const pending = this.pendingStates.get(data.id);
+      if (pending) actor.setState(pending);
+    } catch (error) {
+      console.error('[GameScene] Failed to load unit:', error);
+    }
+  }
+
+  // Server tick: where the monsters and units are now.
+  handleWorldState({ monsters = [], units = [] }) {
+    [[monsters, this.monsters], [units, this.units]].forEach(([states, actors]) => {
+      states.forEach((state) => {
+        const actor = actors.get(state.id);
+        if (actor) actor.setState(state);
+        else this.pendingStates.set(state.id, state);
+      });
+    });
+  }
+
+  worldActor(kind, id) {
+    return (kind === 'monster' ? this.monsters : this.units).get(id) || null;
+  }
+
+  // Position of anything that can be attacked (hero, monster or unit), or null when it is not in the scene.
+  entityPosition(kind, id) {
+    return (kind === 'player' ? this.players.get(id)?.mesh : this.worldActor(kind, id)?.group)?.position || null;
+  }
+
+  // A monster / unit attacked or healed: play its animation and effect and show the result.
+  handleEntityAttack(event) {
+    const attacker = this.worldActor(event.kind, event.id);
+    const to = this.entityPosition(event.targetKind, event.targetId);
+
+    if (attacker && to) {
+      attacker.attack(event.slot || 'attack1', to.x, to.z);
+      const from = attacker.group.position;
+      const volume = this.soundVolume(from);
+      if (event.effect) {
+        this.effects.spawn(event.effect, {
+          position: from,
+          rotationY: Math.atan2(to.x - from.x, to.z - from.z),
+          range: Math.hypot(to.x - from.x, to.z - from.z),
+          shape: 'line'
+        });
+        playPowerSound(SUMMON_SOUND_EFFECT[event.effect], volume);
+      } else {
+        playPowerSound('slashArc', volume);
+      }
+    }
+
+    const { hit, support } = event;
+    if (support) {
+      const target = this.players.get(event.targetId);
+      if (target) {
+        target.data = { ...target.data, health: support.health, mana: support.mana };
+        this.spawnFloater(target.mesh.position, `+${support.amount}`, support.type === 'mana' ? '#7bb6ff' : '#7dff9c');
+      }
+    } else if (hit && event.targetKind === 'player') {
+      this.applyHit(hit);
+    } else if (hit) {
+      this.applyEntityHit(event.targetKind, { ...hit, id: hit.targetId });
+    }
+  }
+
+  // Damage (and crowd control) received by a monster or unit.
+  applyEntityHit(kind, hit) {
+    const actor = this.worldActor(kind, hit.id);
+    if (!actor) return;
+    actor.setHealth(hit.health);
+    if (hit.damage > 0) this.spawnFloater(actor.group.position, `-${hit.damage}`, '#ffb347');
+    if (hit.stunMs) this.spawnFloater(actor.group.position, 'STUN', '#ffd34d');
+    if (hit.position && (hit.reaction === 'knockback' || hit.reaction === 'pulled')) {
+      actor.targetPosition.set(hit.position.x, 0, hit.position.z);
+    }
+  }
+
+  handleEntityDied({ kind, id, reason }) {
+    const actor = this.worldActor(kind, id);
+    if (!actor) {
+      this.defeatedEntities.add(id);
+      return;
+    }
+    actor.die(kind === 'monster' || reason === 'killed');
+    if (kind === 'monster') this.spawnFloater(actor.group.position, 'X', '#ffd34d');
+  }
+
+  updateWorld(delta) {
+    [this.monsters, this.units].forEach((actors) => {
+      actors.forEach((actor, id) => {
+        actor.update(delta);
+        if (!actor.finished) return;
+        actor.dispose();
+        actors.delete(id);
+      });
+    });
+  }
+
+  clearWorld() {
+    this.mapVersion += 1;
+    [this.monsters, this.units].forEach((actors) => {
+      actors.forEach((actor) => actor.dispose());
+      actors.clear();
+    });
+    this.defeatedEntities.clear();
+    this.pendingStates.clear();
+  }
+
   // Overrides the sky/weather chosen for the room (null keeps the current one).
   setEnvironment(environment) {
     if (environment) this.environment.apply(environment.sky, environment.weather);
   }
 
+  rebuildFootprints() {
+    this.footprints = this.mapObjects.map((object) => object.footprint).filter(Boolean);
+  }
+
+  // Pushes a position out of the solid map objects.
+  collide(x, z) {
+    return this.footprints.length ? resolveObstacles(this.footprints, x, z) : { x, z };
+  }
+
   clearMapObjects() {
     this.mapObjects.forEach((object) => object.dispose());
     this.mapObjects = [];
+    this.footprints = [];
+    this.pathWalkers.forEach((walker) => walker.dispose());
+    this.pathWalkers = [];
   }
 
   createWall(x, y, z, length, orientation) {
@@ -557,7 +783,24 @@ export class GameScene {
     const player = this.getCurrentPlayerEntry();
     if (!player) return;
 
-    if (player.dead || this.gameOver || player.displacement || this.isStunned(player)) {
+    if (player.dead || this.gameOver || player.displacement) {
+      this.setPlayerMoving(player, false);
+      return;
+    }
+
+    // Mind controlled: the player is walked towards whoever controls it and cannot steer.
+    if (performance.now() < (player.dominatedUntil || 0)) {
+      const master = this.players.get(player.dominatorId)?.mesh.position;
+      const toMaster = master ? new THREE.Vector3(master.x - player.mesh.position.x, 0, master.z - player.mesh.position.z) : null;
+      if (toMaster && toMaster.length() > DOMINATED_STOP_DISTANCE) {
+        this.stepLocal(player, toMaster.normalize(), delta, DOMINATED_SPEED_FACTOR);
+      } else {
+        this.setPlayerMoving(player, false);
+      }
+      return;
+    }
+
+    if (this.isStunned(player)) {
       this.setPlayerMoving(player, false);
       return;
     }
@@ -580,11 +823,15 @@ export class GameScene {
       this.flushLocalPosition(player);
       return;
     }
-    moveDir.normalize();
+    this.stepLocal(player, moveDir.normalize(), delta);
+  }
 
-    const distance = MOVE_SPEED * delta;
-    const nextX = THREE.MathUtils.clamp(player.mesh.position.x + moveDir.x * distance, -this.arenaLimit, this.arenaLimit);
-    const nextZ = THREE.MathUtils.clamp(player.mesh.position.z + moveDir.z * distance, -this.arenaLimit, this.arenaLimit);
+  // Moves the local player along `moveDir` (a unit vector), faces it that way and syncs the position.
+  stepLocal(player, moveDir, delta, speedFactor = 1) {
+    const distance = MOVE_SPEED * speedFactor * delta;
+    const wantedX = THREE.MathUtils.clamp(player.mesh.position.x + moveDir.x * distance, -this.arenaLimit, this.arenaLimit);
+    const wantedZ = THREE.MathUtils.clamp(player.mesh.position.z + moveDir.z * distance, -this.arenaLimit, this.arenaLimit);
+    const { x: nextX, z: nextZ } = this.collide(wantedX, wantedZ);
 
     player.mesh.position.set(nextX, 0, nextZ);
     player.model.rotation.y = Math.atan2(moveDir.x, moveDir.z);
@@ -706,7 +953,7 @@ export class GameScene {
         });
       }
 
-      const effectId = custom ? null : this.getEffectId(caster, event.slot, def);
+      const effectId = custom ? null : this.getEffectId(caster, event.slot);
       if (!custom) playActionSound(caster.def, event.slot, effectId, this.soundVolume(caster.mesh.position));
       if (def && effectId) {
         this.effects.spawn(effectId, {
@@ -730,17 +977,16 @@ export class GameScene {
     });
     event.hits.forEach((hit) => this.applyHit(hit));
     (event.towerHits || []).forEach((hit) => this.handleTowerHit(hit));
+    (event.monsterHits || []).forEach((hit) => this.applyEntityHit('monster', hit));
+    (event.unitHits || []).forEach((hit) => this.applyEntityHit('unit', hit));
+    (event.spawned || []).forEach((unit) => this.addUnit(unit));
   }
 
   // Skills use the effect picked in the character generator; basic attacks get a light default one.
-  getEffectId(caster, slot, def) {
+  getEffectId(caster, slot) {
     const chosen = caster.def.effects?.[slot];
     if (chosen) return chosen === 'none' ? null : chosen;
-    if (slot === 'attack1' || slot === 'attack2') {
-      if (getAttackType(caster.def, slot) === 'punch' && def?.shape === 'cone') return null; // no blade trail for fists
-      if (def?.shape === 'cone') return 'slashArc';
-      if (def?.shape === 'line') return 'arrowVolley';
-    }
+    if (slot === 'attack1' || slot === 'attack2') return attackEffectId(getAttackType(caster.def, slot), slot);
     return null;
   }
 
@@ -755,7 +1001,11 @@ export class GameScene {
     playReactionSound(target.def, hit.reaction === 'stunned' ? 'hit' : hit.reaction, this.soundVolume(target.mesh.position));
     if (hit.stunMs) {
       target.stunUntil = Math.max(target.stunUntil, performance.now() + hit.stunMs);
-      this.spawnFloater(target.mesh.position, 'STUN', '#ffd34d');
+      this.spawnFloater(target.mesh.position, hit.dominateMs ? 'MIND' : 'STUN', hit.dominateMs ? '#ff6bd6' : '#ffd34d');
+      if (hit.dominateMs) {
+        target.dominatedUntil = performance.now() + hit.dominateMs;
+        target.dominatorId = hit.dominatorId;
+      }
     } else if (hit.reaction !== 'hit') {
       this.displace(target, hit.position, KNOCKBACK_SECONDS, KNOCKBACK_STUN_MS);
     }
@@ -792,6 +1042,8 @@ export class GameScene {
       move.elapsed += delta;
       const u = Math.min(1, move.elapsed / move.duration);
       player.mesh.position.lerpVectors(move.from, move.to, 1 - (1 - u) ** 3);
+      const free = this.collide(player.mesh.position.x, player.mesh.position.z);
+      player.mesh.position.set(free.x, 0, free.z);
       if (u >= 1) {
         player.displacement = null;
         player.targetPosition.copy(player.mesh.position);
@@ -816,6 +1068,7 @@ export class GameScene {
     player.dead = false;
     player.displacement = null;
     player.stunUntil = 0;
+    player.dominatedUntil = 0;
     player.cooldownEnds = {};
     player.data = { ...player.data, ...data };
     player.actor.endOneShot();
@@ -877,7 +1130,17 @@ export class GameScene {
       const remaining = Math.max(0, me.cooldownEnds[slot] - now);
       if (remaining > 0) cooldowns[slot] = { remaining, total: me.cooldownTotals[slot] };
     });
-    return { role: me.role, dead: me.dead, mana: this.socketService ? me.data.mana : null, cooldowns };
+    return { role: me.role, dead: me.dead, mana: this.socketService ? me.data.mana : null, cooldowns, shop: this.getShopState(me) };
+  }
+
+  // The shop opens near your own tower, and only during the first minutes of the match.
+  getShopState(me) {
+    const tower = [...this.towers.values()].find((entry) => entry.team === me.data.team);
+    const nearBase =
+      !!tower &&
+      Math.hypot(me.mesh.position.x - tower.position.x, me.mesh.position.z - tower.position.z) <= tower.radius + SHOP_RANGE;
+    const secondsLeft = Math.max(0, SHOP_OPEN_SECONDS - (Date.now() - this.startedAt) / 1000);
+    return { nearBase, secondsLeft };
   }
 
   // ---------------------------------------------------------------------------
@@ -936,6 +1199,7 @@ export class GameScene {
     this.updateDisplacements(delta);
     this.updateRemotePlayers(delta);
     this.mapObjects.forEach((object) => object.update(delta));
+    this.pathWalkers.forEach((walker) => walker.update(delta));
     const now = performance.now();
     for (const player of this.players.values()) {
       // Remote players stop sending updates when they stop, so no "idle" event ever arrives;
@@ -946,6 +1210,7 @@ export class GameScene {
       player.actor.update(delta);
     }
     this.updateStealth(now);
+    this.updateWorld(delta);
     this.effects.update(delta);
     this.updateFloaters(delta);
 
@@ -967,6 +1232,7 @@ export class GameScene {
     this.effects.dispose();
     while (this.floaters.length) this.removeFloater(this.floaters.length - 1);
     this.players.forEach((player) => player.actor.dispose());
+    this.clearWorld();
     this.clearMapObjects();
     this.clearTowers();
     this.renderer.dispose();

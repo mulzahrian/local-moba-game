@@ -1,4 +1,5 @@
 import { HIT_RADIUS, getActionDef, getManaCost } from '../../shared/characterConfig.js';
+import { hurt } from './entities.js';
 
 const PULL_STOP_DISTANCE = 3; // pulled targets stop this far in front of the caster
 const CC_STUN_MS = 450;
@@ -70,7 +71,7 @@ export function resolveAction(room, caster, slot, rawDir, now = Date.now(), cust
   caster.mana -= cost;
 
   const limit = getArenaLimit(room);
-  const event = { casterId: caster.id, slot, dir, hits: [], towerHits: [], heals: [], casterPosition: null };
+  const event = { casterId: caster.id, slot, dir, hits: [], towerHits: [], monsterHits: [], unitHits: [], heals: [], casterPosition: null };
   if (custom) event.skill = publicSkill(custom);
 
   // Attacking breaks invisibility.
@@ -125,6 +126,13 @@ export function resolveAction(room, caster, slot, rawDir, now = Date.now(), cust
         reaction = 'stunned';
         stunMs = Math.min(def.cc.ms || 0, MAX_SKILL_STUN_MS);
         target.stunUntil = Math.max(target.stunUntil || 0, now + stunMs);
+      } else if (def.cc?.type === 'dominate') {
+        // mind control: the target cannot act and walks towards the caster
+        reaction = 'dominated';
+        stunMs = Math.min(def.cc.ms || 0, MAX_SKILL_STUN_MS);
+        target.stunUntil = Math.max(target.stunUntil || 0, now + stunMs);
+        target.dominatedUntil = now + stunMs;
+        target.dominatedBy = caster.id;
       } else if (def.cc?.type === 'knockback') {
         reaction = 'knockback';
         const dx = target.position.x - caster.position.x;
@@ -153,7 +161,7 @@ export function resolveAction(room, caster, slot, rawDir, now = Date.now(), cust
         }
       }
 
-      if (reaction !== 'hit' && reaction !== 'stunned') target.stunUntil = now + CC_STUN_MS; // bots wait out the displacement
+      if (!['hit', 'stunned', 'dominated'].includes(reaction)) target.stunUntil = now + CC_STUN_MS; // bots wait out the displacement
 
       event.hits.push({
         targetId: target.id,
@@ -162,8 +170,56 @@ export function resolveAction(room, caster, slot, rawDir, now = Date.now(), cust
         reaction,
         position: { x: target.position.x, z: target.position.z },
         died: target.health <= 0,
-        ...(stunMs ? { stunMs } : {})
+        ...(stunMs ? { stunMs } : {}),
+        ...(reaction === 'dominated' ? { dominateMs: stunMs, dominatorId: caster.id } : {})
       });
+    });
+
+    // Monsters and the enemy team's summoned units are hit (and controlled) like heroes.
+    const entities = [
+      ...(room.monsters || []).map((entity) => ({ kind: 'monster', entity })),
+      ...(room.units || []).filter((unit) => unit.team !== caster.team).map((entity) => ({ kind: 'unit', entity }))
+    ];
+    entities.forEach(({ kind, entity }) => {
+      if (entity.dead || !isHit(def, { position: origin }, dir, entity, entity.radius)) return;
+
+      const result = hurt(entity, def.damage || 0);
+      let reaction = 'hit';
+      let stunMs = 0;
+      if (def.cc?.type === 'stun' || def.cc?.type === 'dominate') {
+        reaction = 'stunned';
+        stunMs = Math.min(def.cc.ms || 0, MAX_SKILL_STUN_MS);
+        entity.stunUntil = Math.max(entity.stunUntil || 0, now + stunMs);
+      } else if (def.cc?.type === 'knockback' || def.cc?.type === 'pull' || def.cc?.type === 'pulled') {
+        reaction = def.cc.type === 'knockback' ? 'knockback' : 'pulled';
+        const dx = entity.position.x - caster.position.x;
+        const dz = entity.position.z - caster.position.z;
+        const length = Math.hypot(dx, dz);
+        const away = length < 1e-6 ? dir : { x: dx / length, z: dz / length };
+        const moved =
+          reaction === 'knockback'
+            ? { x: entity.position.x + away.x * def.cc.distance, z: entity.position.z + away.z * def.cc.distance }
+            : length > PULL_STOP_DISTANCE
+              ? { x: caster.position.x + away.x * PULL_STOP_DISTANCE, z: caster.position.z + away.z * PULL_STOP_DISTANCE }
+              : entity.position;
+        entity.position = clampToArena(moved, limit);
+        entity.stunUntil = Math.max(entity.stunUntil || 0, now + CC_STUN_MS);
+      }
+
+      if (kind === 'monster') {
+        entity.target = { kind: 'player', id: caster.id }; // hitting a monster provokes it, wherever it stands
+        if (result.died) entity.killerId = caster.id;
+      }
+      const hit = {
+        id: entity.id,
+        damage: def.damage,
+        health: entity.health,
+        reaction,
+        position: { x: entity.position.x, z: entity.position.z },
+        died: result.died,
+        ...(stunMs ? { stunMs } : {})
+      };
+      (kind === 'monster' ? event.monsterHits : event.unitHits).push(hit);
     });
   }
 

@@ -48,39 +48,11 @@
 }
 
 /* In-game: equipped skills and the inventory */
-.skill-slot .skill-icon {
-  border: none;
-  background: transparent;
-}
-
-.skill-slot.skill-equipped {
-  border-color: #c9a561;
-}
-
-.skill-slot.skill-empty {
-  opacity: 0.45;
-}
-
-.skill-bar-toggle {
-  align-self: stretch;
-  min-width: 64px;
-  padding: 0 10px;
-  color: #f4d78a;
-  font-size: 11px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  cursor: pointer;
-  background: linear-gradient(180deg, rgba(70, 46, 24, 0.9), rgba(34, 22, 11, 0.95));
-  border: 1px solid #8a6a2e;
-  border-radius: 6px;
-  pointer-events: auto;
-}
-
 .skill-inventory {
   position: fixed;
   z-index: 70;
   left: 50%;
-  bottom: 110px;
+  bottom: 170px;
   width: min(460px, 92vw);
   max-height: 50vh;
   overflow-y: auto;
@@ -150,4 +122,118 @@
   cursor: pointer;
   background: transparent;
   border: none;
+}
+
+/* Shop, money and rewards */
+.shop-status {
+  display: flex;
+  justify-content: space-between;
+  margin: 0 0 6px;
+  color: #ffd86b;
+  font-size: 12px;
+}
+
+.skill-inventory-item button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.reward-toasts {
+  position: fixed;
+  z-index: 80;
+  top: 90px;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.reward-toast {
+  padding: 8px 18px;
+  color: #fff3c4;
+  font-size: 14px;
+  letter-spacing: 1px;
+  background: rgba(30, 18, 8, 0.92);
+  border: 1px solid #c9a561;
+  border-radius: 6px;
+  box-shadow: 0 0 14px rgba(244, 215, 138, 0.35);
+  animation: reward-toast-in 0.25s ease-out;
+}
+
+@keyframes reward-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Unit editor of the summon skill generators */
+.sk-tabs {
+  margin-bottom: 12px;
+}
+
+.unit-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 6px;
+}
+
+.unit-chip {
+  padding: 4px 12px;
+  color: #ecd9a8;
+  cursor: pointer;
+  background: rgba(40, 26, 13, 0.9);
+  border: 1px solid #6e5428;
+  border-radius: 14px;
+}
+
+.unit-chip.active {
+  color: #1d1305;
+  background: linear-gradient(180deg, #f4d78a, #c9a561);
+}
+
+.unit-box {
+  padding: 10px;
+  margin-bottom: 10px;
+  border: 1px solid rgba(138, 106, 46, 0.5);
+  border-radius: 6px;
+}
+
+.actor-slots {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.actor-slot {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.actor-slot .ol-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.actor-viewport {
+  width: 100%;
+  height: 240px;
+  margin-top: 10px;
+  overflow: hidden;
+  background: #120d08;
+  border: 1px solid #6e5428;
+  border-radius: 4px;
+}
+
+.actor-viewport canvas {
+  display: block;
 }

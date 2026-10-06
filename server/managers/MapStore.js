@@ -2,6 +2,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { REQUIRED_TOWERS, countTowers, sanitizeMusic } from '../../shared/mapConfig.js';
+import { clampAggroRange } from '../../shared/monsterConfig.js';
+import { sanitizePaths } from '../../shared/pathConfig.js';
 
 export class MapValidationError extends Error {}
 
@@ -15,6 +17,7 @@ const WEATHERS = ['clear', 'rain'];
 
 const num = (value, fallback = 0) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
 const str = (value, max = 120) => String(value ?? '').slice(0, max);
+const axisScale = (value) => Math.min(Math.max(num(value, 1), 0.01), 1000);
 
 export function isValidMapId(id) {
   return typeof id === 'string' && ID_PATTERN.test(id);
@@ -56,10 +59,18 @@ export function sanitizeMap(input, id, previous = null) {
       type: str(o?.type, 80),
       position: { x: num(o?.position?.x), y: num(o?.position?.y), z: num(o?.position?.z) },
       rotationY: num(o?.rotationY),
+      ...(num(o?.rotationX) ? { rotationX: num(o.rotationX) } : {}),
+      ...(num(o?.rotationZ) ? { rotationZ: num(o.rotationZ) } : {}),
       scale: Math.min(Math.max(num(o?.scale, 1), 0.01), 1000),
+      ...(['scaleX', 'scaleY', 'scaleZ'].some((k) => axisScale(o?.[k]) !== 1)
+        ? { scaleX: axisScale(o?.scaleX), scaleY: axisScale(o?.scaleY), scaleZ: axisScale(o?.scaleZ) }
+        : {}),
       animation: o?.animation ? str(o.animation, 120) : null,
-      ...(o?.tower === true ? { tower: true } : {})
-    })).filter((o) => o.type)
+      ...(o?.tower === true ? { tower: true } : {}),
+      ...(o?.noCollision === true ? { noCollision: true } : {}),
+      ...(o?.monster === true ? { monster: true, aggroRange: clampAggroRange(o?.aggroRange) } : {})
+    })).filter((o) => o.type),
+    paths: sanitizePaths(input?.paths)
   };
 }
 

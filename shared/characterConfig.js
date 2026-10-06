@@ -26,7 +26,7 @@ export const SKILL_SLOTS = ['skill1', 'skill2', 'skill3'];
 // Decide which voice plays when the character is hurt, and which sound / look a basic attack gets.
 export const GENDERS = ['male', 'female'];
 export const DEFAULT_GENDER = 'male';
-export const ATTACK_TYPES = ['sword', 'punch'];
+export const ATTACK_TYPES = ['sword', 'punch', 'shot'];
 export const DEFAULT_ATTACK_TYPE = 'sword';
 export const ATTACK_SLOTS = ['attack1', 'attack2'];
 
@@ -51,7 +51,28 @@ export const EFFECT_IDS = [
   'windVortex',
   'shockwave',
   'arrowVolley',
-  'meteorFall'
+  'meteorFall',
+  // shooting effects
+  'flameArrow',
+  'frostArrow',
+  'thunderArrow',
+  'windArrow',
+  'arcaneCircleShot',
+  'sigilBarrage',
+  'plasmaBeam',
+  'homingOrbs',
+  'crystalShards',
+  // more magic effects
+  'poisonCloud',
+  'holyLight',
+  'earthSpike',
+  'tidalWave',
+  'blackHole',
+  'flameTornado',
+  'bloodNova',
+  'runeSeal',
+  'starfall',
+  'staticField'
 ];
 
 export const MAX_ANIMATION_NAME = 120;

@@ -12,6 +12,7 @@ import shockwavePower from '../music/effect/power/shockwave.mp3';
 import slashPower from '../music/effect/power/slash.mp3';
 import windPower from '../music/effect/power/wind.mp3';
 import hitSfx from '../music/effect/vfx/hit.mp3';
+import bowShootSfx from '../music/effect/vfx/bow-shoot.mp3';
 import jumpSfx from '../music/effect/vfx/jump.mp3';
 import knockSfx from '../music/effect/vfx/knock.mp3';
 import pulledSfx from '../music/effect/vfx/pulled.mp3';
@@ -21,23 +22,44 @@ import slashSfx from '../music/effect/vfx/slash.mp3';
 import hitFemaleVoice from '../music/effect/voice/hit-female.mp3';
 import hitMaleVoice from '../music/effect/voice/hit-male.mp3';
 
-// Sound of every skill effect picked in the character generator (folder music/effect/power).
+// Sound(s) of every skill effect picked in the character generator (folder music/effect/power).
+// Effects with several sounds play the first one at full volume and the others softer underneath.
 const POWER_SOUNDS = {
-  magicCircle: magicCirclePower,
-  fireBurst: fireBurstPower,
-  iceNova: iceNovaPower,
-  lightningStrike: lightningPower,
-  shadowVanish: shadowVanishPower,
-  slashArc: slashPower,
-  healingAura: healingPower,
-  windVortex: windPower,
-  shockwave: shockwavePower,
-  arrowVolley: arrowPower,
-  meteorFall: meteorPower
+  magicCircle: [magicCirclePower],
+  fireBurst: [fireBurstPower],
+  iceNova: [iceNovaPower],
+  lightningStrike: [lightningPower],
+  shadowVanish: [shadowVanishPower],
+  slashArc: [slashPower],
+  healingAura: [healingPower],
+  windVortex: [windPower],
+  shockwave: [shockwavePower],
+  arrowVolley: [arrowPower],
+  meteorFall: [meteorPower],
+  flameArrow: [arrowPower, fireBurstPower],
+  frostArrow: [arrowPower, iceNovaPower],
+  thunderArrow: [arrowPower, lightningPower],
+  windArrow: [arrowPower, windPower],
+  arcaneCircleShot: [magicCirclePower],
+  sigilBarrage: [magicCirclePower, shockwavePower],
+  plasmaBeam: [magicCirclePower, lightningPower],
+  homingOrbs: [magicCirclePower, windPower],
+  crystalShards: [iceNovaPower, arrowPower],
+  poisonCloud: [shadowVanishPower],
+  holyLight: [healingPower],
+  earthSpike: [shockwavePower],
+  tidalWave: [windPower, shockwavePower],
+  blackHole: [shadowVanishPower, windPower],
+  flameTornado: [fireBurstPower, windPower],
+  bloodNova: [shockwavePower, shadowVanishPower],
+  runeSeal: [magicCirclePower],
+  starfall: [meteorPower],
+  staticField: [lightningPower]
 };
+const LAYER_VOLUME = 0.6;
 
 // Basic attack sound by attack type, and the body sounds (folder music/effect/vfx).
-const ATTACK_SOUNDS = { sword: slashSfx, punch: punchSfx };
+const ATTACK_SOUNDS = { sword: slashSfx, punch: punchSfx, shot: bowShootSfx };
 const REACTION_SOUNDS = { hit: hitSfx, knockback: knockSfx, pulled: pulledSfx };
 
 // Hurt voice by gender (folder music/effect/voice).
@@ -52,7 +74,7 @@ export function playActionSound(def, slot, effectId, volume = 1) {
   } else if (slot === 'jump') {
     audioService.playSfx(jumpSfx, volume);
   } else if (effectId) {
-    audioService.playSfx(POWER_SOUNDS[effectId], volume);
+    playPowerSound(effectId, volume);
   }
 }
 
@@ -66,5 +88,5 @@ export function playReactionSound(def, reaction, volume = 1) {
 
 /** Skill effect sound on its own (used by the effect gallery in the character generator). */
 export function playPowerSound(effectId, volume = 1) {
-  audioService.playSfx(POWER_SOUNDS[effectId], volume);
+  (POWER_SOUNDS[effectId] || []).forEach((sound, i) => audioService.playSfx(sound, i === 0 ? volume : volume * LAYER_VOLUME));
 }

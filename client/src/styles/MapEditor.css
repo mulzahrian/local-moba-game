@@ -257,6 +257,7 @@
 }
 
 .ed-field input[type='number'],
+.ed-field input[type='text'],
 .ed-field select {
   padding: 6px 8px;
   font-family: inherit;
@@ -302,3 +303,69 @@
   background: #170f08;
   border-top: 1px solid #5c4521;
 }
+
+.ed-gizmo-bar {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 3;
+  display: flex;
+  gap: 4px;
+}
+
+.ed-gizmo-bar .ed-btn { padding: 6px 10px; font-size: 12px; }
+
+.ed-draw-hint {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  padding: 6px 14px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: #ffd34d;
+  background: rgba(10, 6, 3, 0.85);
+  border: 1px solid #b8893a;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+.ed-vec { display: flex; gap: 4px; }
+
+.ed-vec-axis {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.ed-vec-axis b { font-size: 11px; }
+.ed-vec-axis.axis-x b { color: #ff6a5a; }
+.ed-vec-axis.axis-y b { color: #7bdc6a; }
+.ed-vec-axis.axis-z b { color: #6aa8ff; }
+
+.ed-vec-axis input[type='number'] {
+  width: 100%;
+  min-width: 0;
+  padding: 5px 4px;
+  font-family: inherit;
+  font-size: 12px;
+  color: #f6e2ae;
+  background: rgba(10, 6, 3, 0.75);
+  border: 1px solid #8a6a2e;
+  border-radius: 3px;
+}
+
+.ed-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: #c9a561;
+  cursor: pointer;
+}
+
+.ed-check input { accent-color: #e0702a; }

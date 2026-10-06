@@ -67,7 +67,27 @@ export function tickBots(room, dt, cast, now = Date.now()) {
   const limit = getArenaLimit(room);
 
   room.players.forEach((bot) => {
-    if (!bot.isBot || bot.dead || (bot.stunUntil || 0) > now) return;
+    if (!bot.isBot || bot.dead) return;
+    if ((bot.dominatedUntil || 0) > now) {
+      // mind controlled: the bot walks towards whoever controls it instead of acting
+      const master = room.players.find((p) => p.id === bot.dominatedBy);
+      if (master) {
+        const dx = master.position.x - bot.position.x;
+        const dz = master.position.z - bot.position.z;
+        const length = Math.hypot(dx, dz);
+        if (length > 3) {
+          const step = Math.min(length - 3, BOT_SPEED * 0.7 * dt);
+          bot.position = {
+            ...bot.position,
+            x: Math.min(Math.max(bot.position.x + (dx / length) * step, -limit), limit),
+            z: Math.min(Math.max(bot.position.z + (dz / length) * step, -limit), limit)
+          };
+          moved.push(bot);
+        }
+      }
+      return;
+    }
+    if ((bot.stunUntil || 0) > now) return;
     const mem = getMemory(bot);
     const target = findTarget(room, bot, now);
     if (!target) return;

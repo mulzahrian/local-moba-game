@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MapEditorScene, DEFAULT_MAP_SIZE } from '../../map/MapEditorScene.js';
+import { MapEditorScene, DEFAULT_MAP_SIZE, GIZMO_MODES } from '../../map/MapEditorScene.js';
 import { SKY_OPTIONS, WEATHER_OPTIONS, DEFAULT_SKY, DEFAULT_WEATHER } from '../../map/environment.js';
 import {
   getAnimationNames,
@@ -11,6 +11,8 @@ import {
 } from '../../map/mapAssets.js';
 import { mapApi } from '../../map/mapApi.js';
 import { REQUIRED_TOWERS, countTowers, MAP_MUSIC_OPTIONS, MUSIC_NONE, sanitizeMusic } from '../../../../shared/mapConfig.js';
+import { AGGRO_RANGE, clampAggroRange } from '../../../../shared/monsterConfig.js';
+import { PATH_ANIM_SPEED, PATH_SPEED, PATH_SCALE, guessWalkAnimation } from '../../../../shared/pathConfig.js';
 import { GameScene } from '../../scenes/GameScene.js';
 import { CategoryIcon, CameraIcon } from './FantasyIcons.jsx';
 import { CharacterPicker } from '../character/CharacterPicker.jsx';
@@ -41,6 +43,33 @@ function NumberField({ label, value, onChange, step = 1, min, max }) {
         }}
       />
     </label>
+  );
+}
+
+const AXES = ['x', 'y', 'z'];
+
+// Three number boxes (X / Y / Z) in one row, like a vector field in a 3D tool.
+function Vec3Field({ label, value, onChange, step = 1 }) {
+  return (
+    <div className="ed-field">
+      <span>{label}</span>
+      <div className="ed-vec">
+        {AXES.map((axis) => (
+          <label key={axis} className={`ed-vec-axis axis-${axis}`}>
+            <b>{axis.toUpperCase()}</b>
+            <input
+              type="number"
+              value={round2(value[axis])}
+              step={step}
+              onChange={(e) => {
+                const parsed = parseFloat(e.target.value);
+                if (!Number.isNaN(parsed)) onChange(axis, parsed);
+              }}
+            />
+          </label>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -96,6 +125,12 @@ export function MapEditor({ mapId, onExit }) {
   const [dirty, setDirty] = useState(false);
   const [status, setStatus] = useState(null); // { type: 'ok' | 'error', text }
   const [animationNames, setAnimationNames] = useState([]);
+  const [paths, setPaths] = useState([]);
+  const [selectedPathId, setSelectedPathId] = useState(null);
+  const [drawingPath, setDrawingPath] = useState(false);
+  const [pathAnimationNames, setPathAnimationNames] = useState([]);
+  const [gizmoMode, setGizmoMode] = useState('translate');
+  const [gizmoSpace, setGizmoSpace] = useState('world');
   const [previewMap, setPreviewMap] = useState(null);
   const previewRef = useRef(null);
   const previewGameRef = useRef(null);
@@ -108,6 +143,8 @@ export function MapEditor({ mapId, onExit }) {
   const activeCategory = categories.some((c) => c.id === category) ? category : categories[0]?.id;
   const visibleDefinitions = definitions.filter((d) => d.category === activeCategory);
   const selected = objects.find((o) => o.uid === selectedUid) || null;
+  const selectedPath = paths.find((p) => p.id === selectedPathId) || null;
+  const walkerDefinitions = definitions.filter((d) => !d.tower);
   const towerCount = countTowers(objects);
   const activeType = selected?.type || placingType;
 
@@ -124,6 +161,13 @@ export function MapEditor({ mapId, onExit }) {
         if (!loadingRef.current) setDirty(true);
       },
       onSelect: setSelectedUid,
+      onPathsChange: (list) => {
+        setPaths(list);
+        if (!loadingRef.current) setDirty(true);
+      },
+      onPathSelect: setSelectedPathId,
+      onDrawingChange: setDrawingPath,
+      onGizmoModeChange: setGizmoMode,
       onPlacingChange: (settings) => {
         setPlaceSettings(settings);
         if (!settings) setPlacingType(null);
@@ -171,13 +215,51 @@ export function MapEditor({ mapId, onExit }) {
 
   const scene = () => sceneRef.current;
 
+  useEffect(() => {
+    let cancelled = false;
+    getAnimationNames(getObjectDefinition(selectedPath?.type)).then((names) => {
+      if (!cancelled) setPathAnimationNames(names);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPath?.type]);
+
+  // New paths start with the NPC model that was used last (or the first one) and its walk animation.
+  const startPath = async () => {
+    const type = paths[paths.length - 1]?.type || walkerDefinitions[0]?.id || '';
+    const names = await getAnimationNames(getObjectDefinition(type));
+    scene()?.startPath({
+      type,
+      animation: guessWalkAnimation(names),
+      name: t('editor.pathDefaultName', { n: paths.length + 1 })
+    });
+  };
+
+  const changePathWalker = async (type) => {
+    const names = await getAnimationNames(getObjectDefinition(type));
+    scene()?.updateSelectedPath({ type, animation: guessWalkAnimation(names) });
+  };
+
+  const updatePath = (patch) => scene().updateSelectedPath(patch);
+
+  const changeGizmoMode = (mode) => scene().setGizmoMode(mode);
+
+  const changeGizmoSpace = () => {
+    const next = gizmoSpace === 'world' ? 'local' : 'world';
+    setGizmoSpace(next);
+    scene().setGizmoSpace(next);
+  };
   const pickObject = (def) => {
     if (placingType === def.id) {
       scene().setPlacingType(null);
       return;
     }
     setPlacingType(def.id);
-    scene().setPlacingType(def.id, { animation: def.defaultAnimation || null });
+    scene().setPlacingType(def.id, {
+      animation: def.defaultAnimation || null,
+      ...(def.monster ? { aggroRange: AGGRO_RANGE.value } : {})
+    });
   };
 
   const changeSnap = (value) => {
@@ -226,7 +308,8 @@ export function MapEditor({ mapId, onExit }) {
       sky,
       weather,
       music,
-      objects: objectsToSave
+      objects: objectsToSave,
+      paths: scene().getPaths()
     };
     try {
       const map = savedId ? await mapApi.update(savedId, payload) : await mapApi.create(payload);
@@ -274,7 +357,7 @@ export function MapEditor({ mapId, onExit }) {
   const beginPreview = () => {
     setPickingCharacter(false);
     scene().setPaused(true);
-    setPreviewMap({ size, sky, weather, music, objects: scene().getObjects(), characterId });
+    setPreviewMap({ size, sky, weather, music, objects: scene().getObjects(), paths: scene().getPaths(), characterId });
   };
 
   const getPreviewScene = useCallback(() => previewGameRef.current, []);
@@ -374,6 +457,23 @@ export function MapEditor({ mapId, onExit }) {
             ))}
           </div>
 
+          <h3>{t('editor.paths')}</h3>
+          <button className={`ed-btn ${drawingPath ? 'primary' : ''}`} onClick={startPath}>
+            {t('editor.pathNew')}
+          </button>
+          <div className="ed-palette">
+            {paths.length === 0 && !drawingPath && <p className="ed-hint">{t('editor.pathNone')}</p>}
+            {paths.map((path, index) => (
+              <button
+                key={path.id}
+                className={`ed-item ${selectedPathId === path.id ? 'active' : ''}`}
+                onClick={() => scene().selectPath(path.id)}
+              >
+                {path.name || t('editor.pathDefaultName', { n: index + 1 })}
+              </button>
+            ))}
+          </div>
+
           <h3>{t('editor.ground')}</h3>
           <label className="ed-field">
             <span>{t('editor.mapSize')}</span>
@@ -421,6 +521,23 @@ export function MapEditor({ mapId, onExit }) {
 
         <div className="editor-viewport-wrap">
           <div className="editor-viewport" ref={containerRef} />
+          {selected && (
+            <div className="ed-gizmo-bar">
+              {GIZMO_MODES.map((mode) => (
+                <button
+                  key={mode}
+                  className={`ed-btn ${gizmoMode === mode ? 'primary' : ''}`}
+                  onClick={() => changeGizmoMode(mode)}
+                >
+                  {t(`editor.gizmo.${mode}`)}
+                </button>
+              ))}
+              <button className="ed-btn" title={t('editor.gizmo.space')} onClick={changeGizmoSpace}>
+                {t(`editor.gizmo.${gizmoSpace}`)}
+              </button>
+            </div>
+          )}
+          {drawingPath && <div className="ed-draw-hint">{t('editor.pathDrawingHint')}</div>}
           <div className="ed-camera-bar">
             <button className="ed-cam-btn" title={t('editor.camRotateLeft')} onClick={() => scene().rotateCamera(-45)}><CameraIcon name="rotateLeft" /></button>
             <button className="ed-cam-btn" title={t('editor.camRotateRight')} onClick={() => scene().rotateCamera(45)}><CameraIcon name="rotateRight" /></button>
@@ -438,17 +555,37 @@ export function MapEditor({ mapId, onExit }) {
               <div className="ed-object-name">
                 {localizedName(getObjectDefinition(selected.type), language) || selected.type}
               </div>
-              <NumberField label={t('editor.positionX')} value={selected.position.x}
-                onChange={(v) => updateSelected({ position: { x: v } })} />
-              <NumberField label={t('editor.positionZ')} value={selected.position.z}
-                onChange={(v) => updateSelected({ position: { z: v } })} />
-              <NumberField label={t('editor.positionY')} value={selected.position.y}
-                onChange={(v) => updateSelected({ position: { y: v } })} />
-              <SliderField label={`${t('editor.rotation')} (°)`} value={selected.rotationY}
-                min={0} max={360} step={5} onChange={(v) => updateSelected({ rotationY: v })} />
-              <SliderField label={t('editor.scale')} value={selected.scale}
+              <Vec3Field label={t('editor.location')} value={selected.position}
+                onChange={(axis, v) => updateSelected({ position: { [axis]: v } })} />
+              <Vec3Field label={t('editor.rotation3')} step={5}
+                value={{ x: selected.rotationX || 0, y: selected.rotationY || 0, z: selected.rotationZ || 0 }}
+                onChange={(axis, v) => updateSelected({ [`rotation${axis.toUpperCase()}`]: v })} />
+              <Vec3Field label={t('editor.scale3')} step={0.1}
+                value={{
+                  x: selected.scale * (selected.scaleX || 1),
+                  y: selected.scale * (selected.scaleY || 1),
+                  z: selected.scale * (selected.scaleZ || 1)
+                }}
+                onChange={(axis, v) =>
+                  updateSelected({ [`scale${axis.toUpperCase()}`]: Math.max(v, 0.01) / (selected.scale || 1) })} />
+              <SliderField label={t('editor.scaleUniform')} value={selected.scale}
                 min={0.1} max={10} step={0.05}
                 onChange={(v) => updateSelected({ scale: Math.max(v, 0.01) })} />
+              {!selected.monster && (
+                <label className="ed-check">
+                  <input type="checkbox" checked={!selected.noCollision}
+                    onChange={(e) => updateSelected({ noCollision: !e.target.checked })} />
+                  <span>{t('editor.solid')}</span>
+                </label>
+              )}
+              {selected.monster && (
+                <>
+                  <SliderField label={t('editor.aggroRange')} value={selected.aggroRange ?? AGGRO_RANGE.value}
+                    min={AGGRO_RANGE.min} max={AGGRO_RANGE.max} step={AGGRO_RANGE.step}
+                    onChange={(v) => updateSelected({ aggroRange: clampAggroRange(v) })} />
+                  <p className="ed-hint">{t('editor.aggroHint')}</p>
+                </>
+              )}
               {animationNames.length > 0 &&
                 animationSelect(selected.animation, (v) => updateSelected({ animation: v }))}
               <div className="ed-actions">
@@ -460,17 +597,96 @@ export function MapEditor({ mapId, onExit }) {
             </>
           )}
 
-          {!selected && placeSettings && (
+          {selectedPath && (
+            <>
+              <h3>{t('editor.pathSelected')}</h3>
+              <label className="ed-field">
+                <span>{t('editor.pathName')}</span>
+                <input type="text" value={selectedPath.name} maxLength={60}
+                  onChange={(e) => updatePath({ name: e.target.value })} />
+              </label>
+              <label className="ed-field">
+                <span>{t('editor.pathWalker')}</span>
+                <select value={selectedPath.type} onChange={(e) => changePathWalker(e.target.value)}>
+                  {!selectedPath.type && <option value="">—</option>}
+                  {categories.map((c) => {
+                    const items = walkerDefinitions.filter((d) => d.category === c.id);
+                    return items.length === 0 ? null : (
+                      <optgroup key={c.id} label={c.name[language] || c.name.en}>
+                        {items.map((d) => (
+                          <option key={d.id} value={d.id}>{localizedName(d, language)}</option>
+                        ))}
+                      </optgroup>
+                    );
+                  })}
+                </select>
+              </label>
+              {pathAnimationNames.length > 0 && (
+                <label className="ed-field">
+                  <span>{t('editor.animation')}</span>
+                  <select value={selectedPath.animation || ''}
+                    onChange={(e) => updatePath({ animation: e.target.value || null })}>
+                    <option value="">{t('editor.noAnimation')}</option>
+                    {pathAnimationNames.map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <SliderField label={t('editor.pathSpeed')} value={selectedPath.speed}
+                min={PATH_SPEED.min} max={PATH_SPEED.max} step={PATH_SPEED.step}
+                onChange={(v) => updatePath({ speed: Math.min(Math.max(v, PATH_SPEED.min), PATH_SPEED.max) })} />
+              <SliderField label={t('editor.pathAnimSpeed')} value={selectedPath.animSpeed}
+                min={PATH_ANIM_SPEED.min} max={PATH_ANIM_SPEED.max} step={PATH_ANIM_SPEED.step}
+                onChange={(v) => updatePath({ animSpeed: Math.min(Math.max(v, PATH_ANIM_SPEED.min), PATH_ANIM_SPEED.max) })} />
+              <SliderField label={t('editor.scale')} value={selectedPath.scale}
+                min={PATH_SCALE.min} max={PATH_SCALE.max} step={PATH_SCALE.step}
+                onChange={(v) => updatePath({ scale: Math.min(Math.max(v, PATH_SCALE.min), PATH_SCALE.max) })} />
+              <label className="ed-check">
+                <input type="checkbox" checked={selectedPath.loop} onChange={(e) => updatePath({ loop: e.target.checked })} />
+                <span>{t('editor.pathLoop')}</span>
+              </label>
+              <p className="ed-hint">{t('editor.pathPoints', { count: selectedPath.points.length })}</p>
+              {selectedPath.points.length < 2 && <p className="ed-hint">{t('editor.pathTooShort')}</p>}
+              <p className="ed-hint">{t('editor.pathHint')}</p>
+              <div className="ed-actions">
+                {drawingPath ? (
+                  <button className="ed-btn primary" onClick={() => scene().finishDrawing()}>
+                    {t('editor.pathFinish')}
+                  </button>
+                ) : (
+                  <button className="ed-btn" onClick={() => scene().resumeDrawing()}>{t('editor.pathAddPoints')}</button>
+                )}
+                <button className="ed-btn danger" onClick={() => scene().deleteSelectedPath()}>
+                  🗑 {t('editor.pathDelete')}
+                </button>
+              </div>
+            </>
+          )}
+
+          {!selected && !selectedPath && placeSettings && (
             <>
               <h3>{t('editor.placeSettings')}</h3>
               <div className="ed-object-name">
                 {t('editor.placing')}: {localizedName(getObjectDefinition(placingType), language)}
               </div>
-              <SliderField label={`${t('editor.rotation')} (°)`} value={placeSettings.rotationY}
+              <SliderField label={`${t('editor.rotation')} X (°)`} value={placeSettings.rotationX || 0}
+                min={-180} max={180} step={5} onChange={(v) => scene().updatePlaceSettings({ rotationX: v })} />
+              <SliderField label={`${t('editor.rotation')} Y (°)`} value={placeSettings.rotationY}
                 min={0} max={360} step={5} onChange={(v) => scene().updatePlaceSettings({ rotationY: v })} />
+              <SliderField label={`${t('editor.rotation')} Z (°)`} value={placeSettings.rotationZ || 0}
+                min={-180} max={180} step={5} onChange={(v) => scene().updatePlaceSettings({ rotationZ: v })} />
               <SliderField label={t('editor.scale')} value={placeSettings.scale}
                 min={0.1} max={10} step={0.05}
                 onChange={(v) => scene().updatePlaceSettings({ scale: Math.max(v, 0.01) })} />
+              {placeSettings.aggroRange !== undefined && (
+                <>
+                  <SliderField label={t('editor.aggroRange')} value={placeSettings.aggroRange}
+                    min={AGGRO_RANGE.min} max={AGGRO_RANGE.max} step={AGGRO_RANGE.step}
+                    onChange={(v) => scene().updatePlaceSettings({ aggroRange: clampAggroRange(v) })} />
+                  <p className="ed-hint">{t('editor.aggroHint')}</p>
+                </>
+              )}
               {animationNames.length > 0 &&
                 animationSelect(placeSettings.animation, (v) => scene().updatePlaceSettings({ animation: v }))}
               <div className="ed-actions">
@@ -481,7 +697,7 @@ export function MapEditor({ mapId, onExit }) {
             </>
           )}
 
-          {!selected && !placeSettings && <p className="ed-hint">{t('editor.nothingSelected')}</p>}
+          {!selected && !selectedPath && !placeSettings && <p className="ed-hint">{t('editor.nothingSelected')}</p>}
 
           <div className="ed-count">{t('editor.count', { count: objects.length })}</div>
           <div className={`ed-count ${towerCount === REQUIRED_TOWERS ? '' : 'ed-count-warn'}`}>

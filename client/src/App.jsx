@@ -6,12 +6,17 @@ import { GameScene } from './scenes/GameScene.js';
 import { useGameStore } from './store/gameStore.js';
 import { socketService } from './services/SocketService.js';
 import { useSkillStore } from './store/skillStore.js';
+import { useWalletStore } from './store/walletStore.js';
+import { useToastStore } from './store/toastStore.js';
+import { WIN_REWARD_GOLD } from '../../shared/economyConfig.js';
+import { ensureSkillLibrary, getSkill, refreshSkillLibrary } from './skill/skillLibrary.js';
+import { RewardToasts } from './components/RewardToasts.jsx';
 import { audioService } from './services/audioService.js';
 import { MenuBackdrop } from './components/MenuBackdrop.jsx';
 import { MagicLoader } from './components/MagicLoader.jsx';
 import { GameResultOverlay } from './components/GameResultOverlay.jsx';
 import { useSettingsStore } from './store/settingsStore.js';
-import { useT } from './i18n/index.js';
+import { translate, useT } from './i18n/index.js';
 import './styles/App.css';
 
 function App() {
@@ -124,6 +129,44 @@ function App() {
       setPlayers(useGameStore.getState().players.map((p) => (stats.has(p.id) ? { ...p, ...stats.get(p.id) } : p)));
     });
 
+    // Monsters and summoned units (server-driven)
+    socketService.on('worldState', (data) => {
+      if (gameSceneRef.current) gameSceneRef.current.handleWorldState(data);
+    });
+
+    socketService.on('entityAttack', (data) => {
+      if (data.players) setPlayers(data.players);
+      if (gameSceneRef.current) gameSceneRef.current.handleEntityAttack(data);
+    });
+
+    socketService.on('entityDied', (data) => {
+      if (gameSceneRef.current) gameSceneRef.current.handleEntityDied(data);
+    });
+
+    // The one who defeated a monster gets its reward: money and (when it has one) a skill.
+    socketService.on('monsterDefeated', (data) => {
+      if (data.killerId !== socketService.socket?.id) return;
+      const { push } = useToastStore.getState();
+      if (data.gold > 0) {
+        useWalletStore.getState().add(data.gold);
+        push(translate(useSettingsStore.getState().language, 'reward.gold', { name: data.name, gold: data.gold }));
+      }
+      if (!data.skillId) return;
+      ensureSkillLibrary().then(async () => {
+        if (!getSkill(data.skillId)) await refreshSkillLibrary();
+        const skill = getSkill(data.skillId);
+        if (!skill) return;
+        const { owned, addSkill } = useSkillStore.getState();
+        const language = useSettingsStore.getState().language;
+        if (owned.includes(skill.id)) {
+          push(translate(language, 'reward.skillOwned', { skill: skill.name }));
+        } else {
+          addSkill(skill.id);
+          push(translate(language, 'reward.skill', { skill: skill.name }));
+        }
+      });
+    });
+
     socketService.on('playerDied', (data) => {
       if (gameSceneRef.current) gameSceneRef.current.handlePlayerDied(data.playerId);
     });
@@ -131,6 +174,12 @@ function App() {
     socketService.on('gameOver', (data) => {
       if (gameSceneRef.current) gameSceneRef.current.handleGameOver();
       setGameResult({ winnerTeam: data.winnerTeam });
+      const { players: current } = useGameStore.getState();
+      const myTeamNow = current.find((p) => p.id === socketService.socket?.id)?.team;
+      if (data.winnerTeam === myTeamNow) {
+        useWalletStore.getState().add(WIN_REWARD_GOLD);
+        useToastStore.getState().push(translate(useSettingsStore.getState().language, 'reward.win', { gold: WIN_REWARD_GOLD }));
+      }
     });
 
     socketService.on('playerRespawned', (data) => {
@@ -300,6 +349,7 @@ function App() {
             messages={messages}
             onSendMessage={handleSendMessage}
           />
+          <RewardToasts />
           {gameResult && (
             <GameResultOverlay
               won={won}

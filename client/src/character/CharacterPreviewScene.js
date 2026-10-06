@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { CharacterActor } from './CharacterActor.js';
 import { EffectManager } from './effects.js';
+import { attackEffectId } from './attackEffects.js';
+import { getAttackType } from '../../../shared/characterConfig.js';
 import { playActionSound, playPowerSound, playReactionSound } from './characterSounds.js';
 
 const PREVIEW_EFFECT_RANGE = 9; // real skill ranges are too large to frame in the small preview
@@ -102,6 +104,14 @@ export class CharacterPreviewScene {
     }
     playActionSound(this.profile, slot, null);
     playReactionSound(this.profile, slot);
+    if (slot === 'attack1' || slot === 'attack2') {
+      this.effects.spawn(attackEffectId(getAttackType(this.profile, slot), slot), {
+        position: { x: 0, y: 0, z: 0 },
+        rotationY: 0,
+        range: PREVIEW_EFFECT_RANGE,
+        shape: 'cone'
+      });
+    }
     return this.actor.play(slot);
   }
 

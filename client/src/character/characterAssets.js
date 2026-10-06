@@ -162,3 +162,23 @@ export function guessAnimations(clipNames) {
   });
   return result;
 }
+
+const ACTOR_PATTERNS = {
+  idle: /idle|stand|wait|breath|hover/i,
+  run: /run|walk|move|jog|fly|flight|glide/i,
+  attack1: /attack|atk|slash|punch|strike|bite|claw/i,
+  attack2: /attack|atk|slash|punch|strike|bite|claw|skill|skl|cast/i,
+  dead: /die|death|dead|dying|defeat/i
+};
+
+// Suggests a clip for each of `slots` (idle, run, attack1, attack2, dead) of a monster / unit model.
+export function guessActorAnimations(clipNames, slots) {
+  const used = new Set();
+  const result = {};
+  slots.forEach((slot) => {
+    const name = clipNames.find((n) => ACTOR_PATTERNS[slot]?.test(n) && !used.has(n));
+    result[slot] = name || null;
+    if (name) used.add(name);
+  });
+  return result;
+}

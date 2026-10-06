@@ -5,6 +5,7 @@ import { CreateRoomView } from './menu/CreateRoomView.jsx';
 import { JoinRoomView } from './menu/JoinRoomView.jsx';
 import { MapListView } from './menu/MapListView.jsx';
 import { ObjectLibraryView } from './menu/ObjectLibraryView.jsx';
+import { MonsterGeneratorView } from './menu/MonsterGeneratorView.jsx';
 import { SkillGeneratorView } from './menu/SkillGeneratorView.jsx';
 import { SettingsView } from './menu/SettingsView.jsx';
 import { MenuBackdrop } from './MenuBackdrop.jsx';
@@ -58,6 +59,9 @@ export function MenuScreen({ onCreateRoom, onJoinRoom }) {
     case 'map-objects':
       content = <ObjectLibraryView onBack={() => setView('main')} onNavigate={setView} />;
       break;
+    case 'map-monsters':
+      content = <MonsterGeneratorView onBack={() => setView('main')} onNavigate={setView} />;
+      break;
     case 'characters':
       content = (
         <CharacterListView
@@ -97,5 +101,7 @@ export function MenuScreen({ onCreateRoom, onJoinRoom }) {
       );
   }
 
-  return <MenuBackdrop wide={view === 'play' || view === 'map-objects' || view === 'skills'}>{content}</MenuBackdrop>;
+  return (
+    <MenuBackdrop wide={['play', 'map-objects', 'map-monsters', 'skills'].includes(view)}>{content}</MenuBackdrop>
+  );
 }

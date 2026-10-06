@@ -1,6 +1,6 @@
 import React from 'react';
 
-const POWER_GLYPHS = { vanish: '👻', heal: '💚', control: '⛓️', fire: '🔥' };
+const POWER_GLYPHS = { vanish: '👻', heal: '💚', control: '⛓️', fire: '🔥', necromancer: '💀', summoner: '🌀', support: '🛡️' };
 
 // The icon uploaded for a skill, or a glyph of its power when it has none.
 export function SkillIcon({ skill, size = 40 }) {

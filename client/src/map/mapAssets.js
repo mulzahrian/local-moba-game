@@ -2,21 +2,26 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { objectApi } from './objectApi.js';
+import { monsterApi } from '../monster/monsterApi.js';
+import { FLIGHT_HEIGHT, monsterObjectType } from '../../../shared/monsterConfig.js';
+import { CHARACTER_HEIGHT } from '../character/characterAssets.js';
 
 const DEFAULT_FIT_SIZE = 10;
 
 // ---------------------------------------------------------------------------
 // Object library (Map Generator > Objects): main objects become categories, their sub objects become
 // placeable definitions. Every object in the game comes from here; it is loaded from the server and
-// shared by the editor and the game.
+// shared by the editor and the game. The monsters of the Monster Generator are added as one more
+// category ("monsters"); placed monsters are fought in the match instead of being plain decoration.
 // ---------------------------------------------------------------------------
 
 const CUSTOM_PREFIX = 'custom:';
+export const MONSTER_CATEGORY = 'monsters';
 let customCategories = [];
 let customDefinitions = new Map();
 let libraryPromise = null;
 
-function applyLibrary(groups) {
+function applyLibrary(groups, monsters = []) {
   customCategories = [];
   customDefinitions = new Map();
   groups.forEach((group) => {
@@ -44,12 +49,31 @@ function applyLibrary(groups) {
         });
       });
   });
+
+  const placeable = monsters.filter((monster) => monster.hasModel);
+  if (placeable.length) {
+    customCategories.push({ id: MONSTER_CATEGORY, custom: true, logoUrl: null, name: { en: 'Monsters', id: 'Monster' } });
+    placeable.forEach((monster) => {
+      const id = monsterObjectType(monster.id);
+      customDefinitions.set(id, {
+        id,
+        category: MONSTER_CATEGORY,
+        name: monster.name,
+        modelUrl: monster.modelUrl,
+        size: CHARACTER_HEIGHT * monster.params.scale, // monsters are fitted by height, like characters
+        fitHeight: true,
+        yOffset: monster.movement === 'flight' ? FLIGHT_HEIGHT : 0,
+        rotationY: 0,
+        defaultAnimation: monster.animations?.idle || '',
+        monster: true
+      });
+    });
+  }
 }
 
 function fetchLibrary() {
-  return objectApi
-    .list()
-    .then(applyLibrary)
+  return Promise.all([objectApi.list(), monsterApi.list().catch(() => [])])
+    .then(([groups, monsters]) => applyLibrary(groups, monsters))
     .catch((error) => {
       console.error('[MapAssets] Could not load the object library:', error);
       applyLibrary([]);
@@ -102,7 +126,7 @@ function loadModel(url) {
           (gltf) => {
             const box = new THREE.Box3().setFromObject(gltf.scene);
             const size = box.getSize(new THREE.Vector3());
-            resolve({ gltf, box, maxSide: Math.max(size.x, size.y, size.z) || 1 });
+            resolve({ gltf, box, maxSide: Math.max(size.x, size.y, size.z) || 1, height: size.y || 1 });
           },
           undefined,
           reject
@@ -170,10 +194,10 @@ export class MapObject {
       model = createPlaceholder(this.def);
     } else {
       try {
-        const { gltf, box, maxSide } = await loadModel(url);
+        const { gltf, box, maxSide, height } = await loadModel(url);
         if (this.disposed) return;
         model = SkeletonUtils.clone(gltf.scene);
-        const fit = (this.def.size || DEFAULT_FIT_SIZE) / maxSide;
+        const fit = (this.def.size || DEFAULT_FIT_SIZE) / (this.def.fitHeight ? height : maxSide);
         model.scale.setScalar(fit);
         model.position.y = -box.min.y * fit + (this.def.yOffset || 0);
         model.rotation.y = THREE.MathUtils.degToRad(this.def.rotationY || 0);
@@ -201,8 +225,18 @@ export class MapObject {
   applyTransform(data) {
     this.data = data;
     this.root.position.set(data.position.x, data.position.y || 0, data.position.z);
-    this.root.rotation.y = THREE.MathUtils.degToRad(data.rotationY || 0);
-    this.root.scale.setScalar(data.scale || 1);
+    this.root.rotation.set(
+      THREE.MathUtils.degToRad(data.rotationX || 0),
+      THREE.MathUtils.degToRad(data.rotationY || 0),
+      THREE.MathUtils.degToRad(data.rotationZ || 0),
+      'YXZ' // yaw first, so rotationY keeps meaning "heading" when tilted
+    );
+    const scale = data.scale || 1;
+    this.root.scale.set(scale * (data.scaleX || 1), scale * (data.scaleY || 1), scale * (data.scaleZ || 1));
+  }
+
+  setTimeScale(value) {
+    if (this.mixer) this.mixer.timeScale = value;
   }
 
   setAnimation(name) {

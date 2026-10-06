@@ -110,7 +110,7 @@ export class Fx {
 }
 
 // Size of an area-style effect around the caster, whatever shape the skill has.
-function areaRadius(range, shape) {
+export function areaRadius(range, shape) {
   if (shape === 'circle') return Math.min(Math.max(range, 3), 20);
   if (shape === 'cone') return Math.min(Math.max(range * 0.6, 3), 9);
   return Math.min(Math.max(range * 0.25, 3), 6);
@@ -498,8 +498,9 @@ export const EFFECT_LABELS = {
 };
 
 // Lets other effect sets (the skill effects) plug their builders into the same manager.
-export function registerEffects(builders) {
+export function registerEffects(builders, labels = null) {
   Object.assign(BUILDERS, builders);
+  if (labels) Object.assign(EFFECT_LABELS, labels);
 }
 
 export function effectLabel(id, language) {

@@ -28,7 +28,7 @@ export class CharacterActor {
     this.oneShot = null; // { slot, action, time }
 
     this.mixer.addEventListener('finished', (event) => {
-      if (this.oneShot && event.action === this.oneShot.action) this.endOneShot();
+      if (this.oneShot && !this.oneShot.hold && event.action === this.oneShot.action) this.endOneShot();
     });
 
     this.crossFadeTo(this.locomotionAction());
@@ -75,8 +75,9 @@ export class CharacterActor {
     return Boolean(this.slotActions[slot]);
   }
 
-  // Plays the clip assigned to `slot` once, then returns to idle/run. Returns false if none is assigned.
-  play(slot) {
+  // Plays the clip assigned to `slot` once, then returns to idle/run (or stays on its last frame with `hold`,
+  // e.g. a death). Returns false if none is assigned.
+  play(slot, { hold = false } = {}) {
     const action = this.slotActions[slot];
     if (!action) {
       if (slot !== 'jump') return false;
@@ -85,7 +86,7 @@ export class CharacterActor {
     }
     action.setLoop(THREE.LoopOnce, 1);
     action.clampWhenFinished = true;
-    this.oneShot = { slot, action, time: 0 };
+    this.oneShot = { slot, action, time: 0, hold };
     if (this.current === action) action.reset().setEffectiveWeight(1).play(); // replaying the clip that is already active
     else this.crossFadeTo(action);
     return true;
@@ -107,7 +108,7 @@ export class CharacterActor {
   update(delta) {
     this.mixer.update(delta);
     this.updateHop(delta);
-    if (this.oneShot) {
+    if (this.oneShot && !this.oneShot.hold) {
       this.oneShot.time += delta;
       if (this.oneShot.time > MAX_ONE_SHOT_SECONDS) this.endOneShot();
     }

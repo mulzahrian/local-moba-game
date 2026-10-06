@@ -24,3 +24,6 @@ server/data/objects/
 
 # skills made in the Skill Generator (icons)
 server/data/skills/
+
+# monsters made in the Monster Generator (GLB models)
+server/data/monsters/

@@ -15,6 +15,8 @@ import characterStore, {
 import objectStore from './managers/ObjectStore.js';
 import { installDefaultObjects } from './managers/DefaultObjects.js';
 import skillStore from './managers/SkillStore.js';
+import monsterStore from './managers/MonsterStore.js';
+import { isMonsterObject, monsterIdOfType } from '../shared/monsterConfig.js';
 import { setLoadout } from './managers/loadouts.js';
 import { sanitizeTeamSize } from '../shared/matchConfig.js';
 import { BUILTIN_CHARACTER_ID, DEFAULT_ROLE } from '../shared/characterConfig.js';
@@ -373,6 +375,108 @@ app.get('/api/skills/:id/icon', async (req, res) => {
     handleMapError(res, error);
   }
 });
+
+// GLB model of a unit summoned by a necromancer / summoner / support skill
+app.put('/api/skills/:id/units/:unitId/model', express.raw({ type: () => true, limit: MAX_MODEL_BYTES }), async (req, res) => {
+  try {
+    if (!Buffer.isBuffer(req.body) || !isGlb(req.body)) {
+      return res.status(400).json({ success: false, message: 'File must be a .glb model' });
+    }
+    const skill = await skillStore.saveUnitModel(req.params.id, req.params.unitId, req.body);
+    if (!skill) return notFound(res, 'Unit');
+    res.json({ success: true, skill: withSkillVersion(skill) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.get('/api/skills/:id/units/:unitId/model', async (req, res) => {
+  try {
+    const skill = await skillStore.get(req.params.id);
+    const unit = skill?.units?.find((candidate) => candidate.id === req.params.unitId);
+    if (!unit?.hasModel) return notFound(res, 'Model');
+    res.type('model/gltf-binary').sendFile(skillStore.unitModelPath(skill.id, unit.id));
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+// Monster library API: monsters made in the Monster Generator (GLB model, animations, stats and the skill they reward)
+const withMonsterVersion = (monster) => ({ ...monster, version: monster.updatedAt });
+
+app.get('/api/monsters', async (req, res) => {
+  try {
+    res.json({ success: true, monsters: (await monsterStore.list()).map(withMonsterVersion) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.get('/api/monsters/:id', async (req, res) => {
+  try {
+    const monster = await monsterStore.get(req.params.id);
+    if (!monster) return notFound(res, 'Monster');
+    res.json({ success: true, monster: withMonsterVersion(monster) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.post('/api/monsters', async (req, res) => {
+  try {
+    res.status(201).json({ success: true, monster: withMonsterVersion(await monsterStore.create(req.body)) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.put('/api/monsters/:id', async (req, res) => {
+  try {
+    const monster = await monsterStore.update(req.params.id, req.body);
+    if (!monster) return notFound(res, 'Monster');
+    res.json({ success: true, monster: withMonsterVersion(monster) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.delete('/api/monsters/:id', async (req, res) => {
+  try {
+    if (!(await monsterStore.remove(req.params.id))) return notFound(res, 'Monster');
+    res.json({ success: true });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.put('/api/monsters/:id/model', express.raw({ type: () => true, limit: MAX_MODEL_BYTES }), async (req, res) => {
+  try {
+    if (!Buffer.isBuffer(req.body) || !isGlb(req.body)) {
+      return res.status(400).json({ success: false, message: 'File must be a .glb model' });
+    }
+    const monster = await monsterStore.saveModel(req.params.id, req.body);
+    if (!monster) return notFound(res, 'Monster');
+    res.json({ success: true, monster: withMonsterVersion(monster) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.get('/api/monsters/:id/model', async (req, res) => {
+  try {
+    const monster = await monsterStore.get(req.params.id);
+    if (!monster?.hasModel) return notFound(res, 'Model');
+    res.type('model/gltf-binary').sendFile(monsterStore.modelPath(monster.id));
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+// The monsters a map places (by id) as { id -> definition }, so the room can spawn them.
+async function loadMapMonsters(map) {
+  const ids = (map?.objects || []).filter(isMonsterObject).map((object) => monsterIdOfType(object.type)).filter(Boolean);
+  return monsterStore.getMany(ids);
+}
 // Resolves the character a player picked into the data the room needs (null when it does not exist).
 async function resolveCharacter(characterId) {
   if (characterId === BUILTIN_CHARACTER_ID) return { id: BUILTIN_CHARACTER_ID, role: DEFAULT_ROLE };
@@ -423,7 +527,8 @@ io.on('connection', (socket) => {
       const room = gameManager.createRoom(roomCode, socket.id, data.playerName, map, sanitizeEnvironment(data.environment, map || {}), character, {
         teamSize: sanitizeTeamSize(data.teamSize),
         singlePlayer,
-        botCharacters: singlePlayer ? await listBotCharacters() : []
+        botCharacters: singlePlayer ? await listBotCharacters() : [],
+        monsterDefs: await loadMapMonsters(map)
       });
         
       if (room) {
@@ -648,6 +753,12 @@ await installDefaultObjects(mapStore).catch((error) => {
 });
 await skillStore.seedDefaults().catch((error) => {
   console.error('[Skills] Could not install the default skills:', error);
+});
+await skillStore.seedSummonDefaults().catch((error) => {
+  console.error('[Skills] Could not install the default summon skills:', error);
+});
+await monsterStore.seedDefaults().catch((error) => {
+  console.error('[Monsters] Could not install the default monsters:', error);
 });
 
 const PORT = process.env.PORT || 3001;
