@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { findClip, instantiateCharacter } from './characterAssets.js';
+import { CHARACTER_HEIGHT, findClip, instantiateCharacter } from './characterAssets.js';
 
 const FADE = 0.15;
+const HOP_SECONDS = 0.6;
 const MAX_ONE_SHOT_SECONDS = 4;
 
 /**
@@ -16,6 +17,9 @@ export class CharacterActor {
     this.model = model;
     this.scale = scale;
     this.mixer = new THREE.AnimationMixer(model);
+    this.baseY = model.position.y;
+    this.hopHeight = CHARACTER_HEIGHT * 0.45 * (def.scale || 1);
+    this.hopTime = null; // seconds into the fallback hop, null when not hopping
 
     this.buildActions(def.animations);
 
@@ -74,7 +78,11 @@ export class CharacterActor {
   // Plays the clip assigned to `slot` once, then returns to idle/run. Returns false if none is assigned.
   play(slot) {
     const action = this.slotActions[slot];
-    if (!action) return false;
+    if (!action) {
+      if (slot !== 'jump') return false;
+      this.hopTime = 0; // no jump clip assigned: fall back to a simple hop of the whole model
+      return true;
+    }
     action.setLoop(THREE.LoopOnce, 1);
     action.clampWhenFinished = true;
     this.oneShot = { slot, action, time: 0 };
@@ -88,8 +96,17 @@ export class CharacterActor {
     this.crossFadeTo(this.locomotionAction());
   }
 
+  updateHop(delta) {
+    if (this.hopTime === null) return;
+    this.hopTime += delta;
+    const u = Math.min(1, this.hopTime / HOP_SECONDS);
+    this.model.position.y = this.baseY + 4 * u * (1 - u) * this.hopHeight;
+    if (u >= 1) this.hopTime = null;
+  }
+
   update(delta) {
     this.mixer.update(delta);
+    this.updateHop(delta);
     if (this.oneShot) {
       this.oneShot.time += delta;
       if (this.oneShot.time > MAX_ONE_SHOT_SECONDS) this.endOneShot();

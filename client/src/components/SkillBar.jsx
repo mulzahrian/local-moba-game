@@ -4,7 +4,7 @@ import { useT } from '../i18n/index.js';
 import { useSettingsStore } from '../store/settingsStore.js';
 import '../styles/Character.css';
 
-const SLOT_KEYS = { attack1: 'LMB', skill1: 'Z', skill2: 'X', skill3: 'C', emote: 'Q' };
+const SLOT_KEYS = { attack1: 'LMB', skill1: 'Z', skill2: 'X', skill3: 'C', emote: 'Q', jump: 'Space' };
 const BAR_SLOTS = ACTION_SLOTS.filter((slot) => slot !== 'attack2'); // attack2 is the follow-up of attack1
 
 // Cooldown / mana overview of the local player's actions. Polls the running GameScene a few times a second.

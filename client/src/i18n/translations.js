@@ -135,6 +135,7 @@ export const translations = {
     'anim.knockback': 'Knocked back',
     'anim.pulled': 'Pulled',
     'anim.emote': 'Emote',
+    'anim.jump': 'Jump',
 
     'key.attack': 'Left click',
     'key.emote': 'Q',
@@ -313,6 +314,7 @@ export const translations = {
     'anim.knockback': 'Terlempar',
     'anim.pulled': 'Tertarik',
     'anim.emote': 'Emot',
+    'anim.jump': 'Lompat',
 
     'key.attack': 'Klik kiri',
     'key.emote': 'Q',

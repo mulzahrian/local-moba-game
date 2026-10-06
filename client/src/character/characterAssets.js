@@ -145,7 +145,8 @@ const GUESS_PATTERNS = [
   ['hit', /hit|hurt|damage|dmg/i],
   ['knockback', /knock|fly|throw|launch|down|fall/i],
   ['pulled', /pull|drag|back/i],
-  ['emote', /emote|dance|wave|taunt|show|greet|joy|laugh/i]
+  ['emote', /emote|dance|wave|taunt|show|greet|joy|laugh/i],
+  ['jump', /jump|leap|hop/i]
 ];
 
 // Suggests a clip for each animation slot from the clip names of a freshly uploaded model.

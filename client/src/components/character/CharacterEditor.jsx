@@ -25,7 +25,8 @@ const SLOT_KEYS = {
   skill1: 'Z',
   skill2: 'X',
   skill3: 'C',
-  emote: 'Q'
+  emote: 'Q',
+  jump: 'Space'
 };
 
 const defaultEffects = (role) =>

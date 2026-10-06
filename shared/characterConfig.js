@@ -17,13 +17,14 @@ export const ANIMATION_SLOTS = [
   'hit',
   'knockback',
   'pulled',
-  'emote'
+  'emote',
+  'jump'
 ];
 
 export const SKILL_SLOTS = ['skill1', 'skill2', 'skill3'];
 
 // Everything the player can trigger with an input (slot -> default key label).
-export const ACTION_SLOTS = ['attack1', 'attack2', 'skill1', 'skill2', 'skill3', 'emote'];
+export const ACTION_SLOTS = ['attack1', 'attack2', 'skill1', 'skill2', 'skill3', 'emote', 'jump'];
 
 export const EFFECT_IDS = [
   'none',
@@ -45,6 +46,7 @@ export const HIT_RADIUS = 1.5; // approximate body radius used for hit detection
 export const MANA_REGEN_PER_SECOND = 4;
 export const RESPAWN_SECONDS = 3;
 export const EMOTE_COOLDOWN = 1.5;
+export const JUMP_COOLDOWN = 0.8;
 export const COMBO_WINDOW_SECONDS = 1.2; // attack 2 follows attack 1 if clicked within this time
 
 /**
@@ -200,7 +202,8 @@ export function getActionDef(role, slot) {
   }
   if (SKILL_SLOTS.includes(slot)) return { slot, ...config.skills[slot] };
   if (slot === 'emote') return { slot, manaPct: 0, damage: 0, cooldown: EMOTE_COOLDOWN, shape: 'none', range: 0 };
-  return null;
+    if (slot === 'jump') return { slot, manaPct: 0, damage: 0, cooldown: JUMP_COOLDOWN, shape: 'none', range: 0 };
+    return null;
 }
 
 export function getManaCost(role, slot) {

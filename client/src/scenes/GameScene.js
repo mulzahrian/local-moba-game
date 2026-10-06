@@ -20,7 +20,8 @@ const DASH_SECONDS = 0.25;
 const KNOCKBACK_SECONDS = 0.3;
 const KNOCKBACK_STUN_MS = 400;
 
-const KEY_ACTIONS = { KeyZ: 'skill1', KeyX: 'skill2', KeyC: 'skill3', KeyQ: 'emote' };
+const KEY_ACTIONS = { KeyZ: 'skill1', KeyX: 'skill2', KeyC: 'skill3', KeyQ: 'emote', Space: 'jump' };
+const NO_REPEAT_ACTIONS = ['emote', 'jump'];
 
 const isTypingTarget = (target) =>
   target instanceof HTMLElement &&
@@ -74,7 +75,8 @@ export class GameScene {
       if (isTypingTarget(event.target)) return;
       const action = KEY_ACTIONS[event.code];
       if (action) {
-        if (!event.repeat || action !== 'emote') this.performAction(action);
+        if (event.code === 'Space') event.preventDefault(); // don't scroll the page / click a focused button
+        if (!event.repeat || !NO_REPEAT_ACTIONS.includes(action)) this.performAction(action);
         return;
       }
       this.setKeyState(event.code, true);
