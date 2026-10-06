@@ -2,17 +2,20 @@ import React, { useEffect, useState } from 'react';
 import { useT } from '../../i18n/index.js';
 import { useSettingsStore } from '../../store/settingsStore.js';
 import { mapApi } from '../../map/mapApi.js';
+import { TEAM_SIZES, DEFAULT_TEAM_SIZE } from '../../../../shared/matchConfig.js';
 import { SKY_OPTIONS, WEATHER_OPTIONS, DEFAULT_SKY, DEFAULT_WEATHER } from '../../map/environment.js';
 
 const DEFAULT_MAP_ID = '';
 
-export function CreateRoomView({ onBack, onCreateRoom }) {
+// Picks the battlefield and the N vs N format; singlePlayer fills the other places with computer players.
+export function CreateRoomView({ onBack, onCreateRoom, singlePlayer = false }) {
   const t = useT();
   const playerName = useSettingsStore((s) => s.playerName);
   const [maps, setMaps] = useState([]);
   const [selected, setSelected] = useState(DEFAULT_MAP_ID);
   const [sky, setSky] = useState(DEFAULT_SKY);
   const [weather, setWeather] = useState(DEFAULT_WEATHER);
+  const [teamSize, setTeamSize] = useState(DEFAULT_TEAM_SIZE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -51,7 +54,7 @@ export function CreateRoomView({ onBack, onCreateRoom }) {
 
   return (
     <div className="menu-panel wide">
-      <h2 className="panel-title">{t('create.title')}</h2>
+      <h2 className="panel-title">{t(singlePlayer ? 'create.titleSingle' : 'create.title')}</h2>
 
       <div className="map-pick-list">
         <button
@@ -78,12 +81,25 @@ export function CreateRoomView({ onBack, onCreateRoom }) {
         ))}
       </div>
 
+      <div className="setting-row">
+        <span className="setting-label">{t('create.versus')}</span>
+        <div className="toggle-group">
+          {TEAM_SIZES.map((size) => (
+            <button key={size} className={`toggle-btn ${teamSize === size ? 'active' : ''}`} onClick={() => setTeamSize(size)}>
+              {size}v{size}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="hint">
+        {singlePlayer ? t('create.versusHintSingle', { others: teamSize * 2 - 1 }) : t('create.versusHint', { total: teamSize * 2 })}
+      </p>
       {choiceRow(t('create.sky'), SKY_OPTIONS, sky, setSky, 'editor.sky.')}
       {choiceRow(t('create.weather'), WEATHER_OPTIONS, weather, setWeather, 'editor.weather.')}
 
       <div className="menu-buttons">
-        <button className="fantasy-btn primary" onClick={() => onCreateRoom(playerName.trim(), selected || null, { sky, weather })}>
-          {t('create.start')}
+        <button className="fantasy-btn primary" onClick={() => onCreateRoom(playerName.trim(), selected || null, { sky, weather }, { teamSize, singlePlayer })}>
+          {t(singlePlayer ? 'create.startSingle' : 'create.start')}
         </button>
         <button className="fantasy-btn ghost" onClick={onBack}>{t('common.back')}</button>
       </div>

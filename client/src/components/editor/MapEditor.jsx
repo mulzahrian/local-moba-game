@@ -9,13 +9,14 @@ import {
   localizedName
 } from '../../map/mapAssets.js';
 import { mapApi } from '../../map/mapApi.js';
-import { REQUIRED_TOWERS, countTowers } from '../../../../shared/mapConfig.js';
+import { REQUIRED_TOWERS, countTowers, MAP_MUSIC_OPTIONS, MUSIC_NONE, sanitizeMusic } from '../../../../shared/mapConfig.js';
 import { GameScene } from '../../scenes/GameScene.js';
 import { CategoryIcon, CameraIcon } from './FantasyIcons.jsx';
 import { CharacterPicker } from '../character/CharacterPicker.jsx';
 import { SkillBar } from '../SkillBar.jsx';
 import { useT } from '../../i18n/index.js';
 import { useSettingsStore } from '../../store/settingsStore.js';
+import { audioService } from '../../services/audioService.js';
 import '../../styles/MapEditor.css';
 
 const SNAP_OPTIONS = [0, 2, 5, 10];
@@ -82,6 +83,8 @@ export function MapEditor({ mapId, onExit }) {
   const [size, setSize] = useState(DEFAULT_MAP_SIZE);
   const [sky, setSky] = useState(DEFAULT_SKY);
   const [weather, setWeather] = useState(DEFAULT_WEATHER);
+  const [music, setMusic] = useState(MUSIC_NONE);
+  const auditioningRef = useRef(false); // true once the user picked a track, so it plays while editing
   const [objects, setObjects] = useState([]);
   const [selectedUid, setSelectedUid] = useState(null);
   const [placingType, setPlacingType] = useState(null);
@@ -129,6 +132,7 @@ export function MapEditor({ mapId, onExit }) {
           setSize(map.size);
           setSky(map.sky || DEFAULT_SKY);
           setWeather(map.weather || DEFAULT_WEATHER);
+          setMusic(sanitizeMusic(map.music));
           scene.loadMap(map);
         })
         .catch((e) => setStatus({ type: 'error', text: e.message }))
@@ -184,6 +188,21 @@ export function MapEditor({ mapId, onExit }) {
     setDirty(true);
   };
 
+  const changeMusic = (value) => {
+    auditioningRef.current = true;
+    setMusic(value);
+    setDirty(true);
+  };
+
+  // Plays the chosen track while previewing or after the user picked one; otherwise the menu music keeps playing.
+  useEffect(() => {
+    if (previewMap) audioService.setMatchMusic(music);
+    else if (auditioningRef.current && music !== MUSIC_NONE) audioService.setMatchMusic(music);
+    else audioService.setTrack('menu');
+  }, [music, previewMap]);
+
+  useEffect(() => () => audioService.setTrack('menu'), []);
+
   const save = async () => {
     const objectsToSave = scene().getObjects();
     const towers = countTowers(objectsToSave);
@@ -196,6 +215,7 @@ export function MapEditor({ mapId, onExit }) {
       size,
       sky,
       weather,
+      music,
       objects: objectsToSave
     };
     try {
@@ -244,7 +264,7 @@ export function MapEditor({ mapId, onExit }) {
   const beginPreview = () => {
     setPickingCharacter(false);
     scene().setPaused(true);
-    setPreviewMap({ size, sky, weather, objects: scene().getObjects(), characterId });
+    setPreviewMap({ size, sky, weather, music, objects: scene().getObjects(), characterId });
   };
 
   const getPreviewScene = useCallback(() => previewGameRef.current, []);
@@ -366,6 +386,16 @@ export function MapEditor({ mapId, onExit }) {
             <select value={weather} onChange={(e) => changeEnvironment(sky, e.target.value)}>
               {WEATHER_OPTIONS.map((w) => (
                 <option key={w} value={w}>{t('editor.weather.' + w)}</option>
+              ))}
+            </select>
+          </label>
+          <label className="ed-field">
+            <span>{t('editor.music')}</span>
+            <select value={music} onChange={(e) => changeMusic(e.target.value)}>
+              {MAP_MUSIC_OPTIONS.map((m) => (
+                <option key={m} value={m}>
+                  {m === MUSIC_NONE ? t('editor.music.none') : t('editor.music.track', { n: m.replace('list', '') })}
+                </option>
               ))}
             </select>
           </label>

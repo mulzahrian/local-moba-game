@@ -73,14 +73,19 @@ class SocketService {
   }
 
   // Room Management
-  createRoom(playerName, mapId, environment, characterId, callback) {
+  createRoom(playerName, mapId, environment, characterId, match, callback) {
     if (!this.socket) {
       console.error('Socket not connected');
       return;
     }
-    this.socket.emit('createRoom', { playerName, mapId, environment, characterId }, (response) => {
+    this.socket.emit('createRoom', { playerName, mapId, environment, characterId, ...match }, (response) => {
       if (callback) callback(response);
     });
+  }
+
+  // Leaves the current room (the server removes the player and any computer players with the last human)
+  leaveRoom() {
+    this.emit('leaveRoom');
   }
 
   joinRoom(roomCode, playerName, characterId, callback) {

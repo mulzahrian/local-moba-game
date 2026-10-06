@@ -31,11 +31,11 @@ export function PlayView({ onNavigate }) {
       {characterId === '' && <p className="hint">{t('pick.required')}</p>}
 
       <div className="menu-buttons">
-        <button className="fantasy-btn primary" disabled={!ready} onClick={() => onNavigate('create')}>
-          {t('play.createRoom')}
+        <button className="fantasy-btn primary" disabled={!ready} onClick={() => onNavigate('single')}>
+          {t('play.singlePlayer')}
         </button>
-        <button className="fantasy-btn" disabled={!ready} onClick={() => onNavigate('join')}>
-          {t('play.joinRoom')}
+        <button className="fantasy-btn" disabled={!ready} onClick={() => onNavigate('multiplayer')}>
+          {t('play.multiplayer')}
         </button>
         <button className="fantasy-btn ghost" onClick={() => onNavigate('main')}>
           {t('common.back')}

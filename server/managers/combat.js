@@ -1,6 +1,7 @@
 import { HIT_RADIUS, getActionDef, getManaCost } from '../../shared/characterConfig.js';
 
 const PULL_STOP_DISTANCE = 3; // pulled targets stop this far in front of the caster
+const CC_STUN_MS = 450;
 
 export function getArenaLimit(room) {
   return (room.map?.size || 500) / 2 - 10;
@@ -129,6 +130,8 @@ export function resolveAction(room, caster, slot, rawDir, now = Date.now()) {
           };
         }
       }
+
+      if (reaction !== 'hit') target.stunUntil = now + CC_STUN_MS; // bots wait out the displacement
 
       event.hits.push({
         targetId: target.id,

@@ -6,12 +6,20 @@ export const REQUIRED_TOWERS = 2;
 
 export const countTowers = (objects) => (objects || []).filter((o) => o?.type === TOWER_TYPE).length;
 
+// Background music a map can play during a match (files in client/src/music/play-list); 'none' = silent.
+export const MUSIC_NONE = 'none';
+export const MAP_MUSIC_TRACKS = ['list1', 'list2', 'list3', 'list4', 'list5'];
+export const MAP_MUSIC_OPTIONS = [MUSIC_NONE, ...MAP_MUSIC_TRACKS];
+
+export const sanitizeMusic = (music) => (MAP_MUSIC_TRACKS.includes(music) ? music : MUSIC_NONE);
+
 export const DEFAULT_MAP_SIZE = 500;
 export const TOWER_MAX_HEALTH = 300;
 export const TOWER_MODEL_HEIGHT = 20; // the tower model is auto-fitted to this size (see mapObjects.json) before its scale
 export const TOWER_RADIUS_PER_SCALE = 8; // approximate footprint radius used for hit detection and spawning
 const FALLBACK_TOWER_RADIUS = 20; // maps without placed towers use the default corner bases
 const SPAWN_GAP = 10; // distance between a tower's edge and its team's spawn point
+const SPAWN_SPACING = 4; // distance between teammates spawning side by side
 
 /**
  * The two bases of a map: the first placed tower belongs to team1 (the host), the second to team2.
@@ -52,11 +60,17 @@ export function buildTowers(map) {
 export const getTowerForTeam = (towers, team) => towers.find((tower) => tower.team === team) || null;
 
 // Spawn point of a team: just outside its tower, on the side facing the middle of the map.
-export function getSpawnPosition(tower, mapSize = DEFAULT_MAP_SIZE) {
+// `slot` is the teammate's index (0-4): teammates line up side by side so nobody spawns inside another player.
+export function getSpawnPosition(tower, mapSize = DEFAULT_MAP_SIZE, slot = 0) {
   const length = Math.hypot(tower.position.x, tower.position.z);
   const dir = length > 1e-6 ? { x: -tower.position.x / length, z: -tower.position.z / length } : { x: 0, z: 1 };
   const distance = tower.radius + SPAWN_GAP;
   const limit = mapSize / 2 - 10;
   const clamp = (value) => Math.min(Math.max(value, -limit), limit);
-  return { x: clamp(tower.position.x + dir.x * distance), y: 0, z: clamp(tower.position.z + dir.z * distance) };
+  const side = Math.ceil(slot / 2) * (slot % 2 === 1 ? 1 : -1) * SPAWN_SPACING; // 0, +1, -1, +2, -2 ...
+  return {
+    x: clamp(tower.position.x + dir.x * distance - dir.z * side),
+    y: 0,
+    z: clamp(tower.position.z + dir.z * distance + dir.x * side)
+  };
 }

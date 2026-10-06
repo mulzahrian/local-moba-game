@@ -1,6 +1,15 @@
 import menuMusicUrl from '../music/main-menu.mp3';
 import loadingMusicUrl from '../music/loading.mp3';
 import buttonClickUrl from '../music/button-click.mp3';
+import victoryUrl from '../music/victory.mp3';
+import lostUrl from '../music/lost.mp3';
+import list1Url from '../music/play-list/list1.mp3';
+import list2Url from '../music/play-list/list2.mp3';
+import list3Url from '../music/play-list/list3.mp3';
+import list4Url from '../music/play-list/list4.mp3';
+import list5Url from '../music/play-list/list5.mp3';
+
+const MATCH_MUSIC_URLS = { list1: list1Url, list2: list2Url, list3: list3Url, list4: list4Url, list5: list5Url };
 
 const UNLOCK_EVENTS = ['pointerdown', 'pointerup', 'click', 'keydown', 'touchend'];
 
@@ -17,7 +26,7 @@ class AudioService {
     this.enabled = true;
     this.sfxCache = new Map();
     this.loops = new Map();
-    this.current = null; // 'menu' | 'loading' | null
+    this.current = null; // 'menu' | 'loading' | 'match:<id>' | null
     this.unlockBound = false;
     this.unlock = this.unlock.bind(this);
   }
@@ -72,6 +81,24 @@ class AudioService {
     if (this.current === name) return;
     this.current = name;
     this.sync();
+  }
+
+  // Background music of a map ('list1'...'list5', see shared/mapConfig.js); anything else is silence.
+  setMatchMusic(id) {
+    const url = MATCH_MUSIC_URLS[id];
+    if (!url) {
+      this.setTrack(null);
+      return;
+    }
+    const name = `match:${id}`;
+    if (!this.tracks[name]) this.tracks[name] = this.createTrack(url, 0.4); // created lazily, the files are large
+    this.setTrack(name);
+  }
+
+  // Stops the background music and plays the end-of-match jingle.
+  playResult(won) {
+    this.setTrack(null);
+    this.playSfx(won ? victoryUrl : lostUrl, 0.9);
   }
 
   playClick() {

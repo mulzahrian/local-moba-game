@@ -12,7 +12,7 @@ import characterStore, {
   imageTypeOf,
   isGlb
 } from './managers/CharacterStore.js';
-import { resolveAction } from './managers/combat.js';
+import { sanitizeTeamSize } from '../shared/matchConfig.js';
 import { BUILTIN_CHARACTER_ID, DEFAULT_ROLE } from '../shared/characterConfig.js';
 
 const app = express();
@@ -196,6 +196,12 @@ async function resolveCharacter(characterId) {
   return character?.hasModel ? { id: character.id, role: character.role } : null;
 }
 
+// Characters the computer players can pick: the built-in one plus every character that has a model.
+async function listBotCharacters() {
+  const characters = (await characterStore.list()).filter((character) => character.hasModel);
+  return [{ id: BUILTIN_CHARACTER_ID, role: DEFAULT_ROLE }, ...characters.map(({ id, role }) => ({ id, role }))];
+}
+
 // Socket.IO Events
 io.on('connection', (socket) => {
   console.log(`[${new Date().toLocaleTimeString()}] Player connected: ${socket.id}`);
@@ -229,7 +235,12 @@ io.on('connection', (socket) => {
         return;
       }
 
-      const room = gameManager.createRoom(roomCode, socket.id, data.playerName, map, sanitizeEnvironment(data.environment, map || {}), character);
+      const singlePlayer = Boolean(data.singlePlayer);
+      const room = gameManager.createRoom(roomCode, socket.id, data.playerName, map, sanitizeEnvironment(data.environment, map || {}), character, {
+        teamSize: sanitizeTeamSize(data.teamSize),
+        singlePlayer,
+        botCharacters: singlePlayer ? await listBotCharacters() : []
+      });
         
       if (room) {
         socket.join(roomCode);
@@ -329,7 +340,9 @@ io.on('connection', (socket) => {
           console.log(`[JoinRoom] 🎮 Game starting in room ${normalizedRoomCode}!`);
           io.to(normalizedRoomCode).emit('gameStarted', {
             roomCode: normalizedRoomCode,
-            players: room.players
+            players: room.players,
+            map: room.map,
+            environment: room.environment
           });
         }
         
@@ -400,19 +413,14 @@ io.on('connection', (socket) => {
     const caster = room?.players.find((p) => p.id === socket.id);
     if (!room || !caster) return;
 
-    const event = resolveAction(room, caster, data.slot, data.dir);
-    if (!event) return;
+    gameManager.performAction(room, caster, data.slot, data.dir);
+  });
 
-    io.to(room.code).emit('skillUsed', { ...event, players: room.players });
-    if (event.winnerTeam) {
-      console.log(`[Combat] ${event.winnerTeam} destroyed the enemy tower in room ${room.code}`);
-      io.to(room.code).emit('gameOver', { winnerTeam: event.winnerTeam });
+  socket.on('leaveRoom', () => {
+    for (const roomCode of socket.rooms) {
+      if (roomCode !== socket.id) socket.leave(roomCode);
     }
-    event.hits.filter((hit) => hit.died).forEach((hit) => {
-      console.log(`[Combat] ${hit.targetId} was defeated by ${caster.id}`);
-      gameManager.scheduleRespawn(room.code, hit.targetId);
-      io.to(room.code).emit('playerDied', { playerId: hit.targetId, killerId: caster.id });
-    });
+    gameManager.playerDisconnect(socket.id);
   });
 
   // Chat Events

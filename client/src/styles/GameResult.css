@@ -1,0 +1,224 @@
+/* Match result overlay: animated shield emblem for victory and defeat */
+.game-result {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.gr-backdrop {
+  position: absolute;
+  inset: 0;
+  animation: gr-fade 0.9s ease-out both;
+}
+.game-result.won .gr-backdrop {
+  background: radial-gradient(circle at 50% 42%, rgba(255, 196, 80, 0.38) 0%, rgba(40, 24, 6, 0.82) 55%, rgba(8, 5, 2, 0.94) 100%);
+}
+.game-result.lost .gr-backdrop {
+  background: radial-gradient(circle at 50% 45%, rgba(90, 14, 14, 0.5) 0%, rgba(12, 6, 8, 0.88) 55%, rgba(2, 1, 2, 0.96) 100%);
+}
+
+/* Victory: slowly turning beams of light behind the shield */
+.gr-rays {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 190vmax;
+  height: 190vmax;
+  margin: -95vmax 0 0 -95vmax;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 220, 130, 0.22) 0deg 8deg, rgba(255, 220, 130, 0) 8deg 24deg);
+  -webkit-mask-image: radial-gradient(circle, #000 0%, transparent 38%);
+  mask-image: radial-gradient(circle, #000 0%, transparent 38%);
+  opacity: 0;
+  animation: gr-fade 1.4s 0.5s ease-out forwards, gr-spin 60s linear infinite;
+  pointer-events: none;
+}
+
+.gr-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.gr-particle {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0;
+  background: hsl(var(--hue), 95%, 62%);
+  box-shadow: 0 0 10px 2px hsla(var(--hue), 95%, 60%, 0.8);
+}
+.game-result.won .gr-particle {
+  bottom: -20px;
+  animation: gr-rise linear infinite;
+}
+.game-result.lost .gr-particle {
+  top: -20px;
+  animation: gr-fall linear infinite;
+}
+
+.gr-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px;
+}
+.game-result.lost .gr-content {
+  animation: gr-shake 0.6s 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+.gr-emblem-wrap {
+  position: relative;
+  width: min(300px, 44vh);
+  aspect-ratio: 260 / 290;
+}
+.game-result.won .gr-emblem-wrap { animation: gr-drop-win 1.1s cubic-bezier(0.22, 1.2, 0.36, 1) both; }
+.game-result.lost .gr-emblem-wrap { animation: gr-drop-lose 0.6s cubic-bezier(0.55, 0, 1, 0.45) both; }
+
+.gr-emblem {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.game-result.won .gr-emblem { animation: gr-float 3.2s 1.2s ease-in-out infinite; filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.6)); }
+.game-result.lost .gr-emblem { filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.8)); }
+
+.gr-glow {
+  position: absolute;
+  inset: -25%;
+  border-radius: 50%;
+  animation: gr-pulse 2.4s ease-in-out infinite;
+}
+.game-result.won .gr-glow { background: radial-gradient(circle, rgba(255, 205, 90, 0.65), rgba(255, 160, 40, 0) 65%); }
+.game-result.lost .gr-glow { background: radial-gradient(circle, rgba(200, 30, 30, 0.45), rgba(120, 0, 0, 0) 65%); animation-duration: 3.6s; }
+
+.gr-flash {
+  position: absolute;
+  inset: -60%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 60%);
+  opacity: 0;
+  pointer-events: none;
+}
+.game-result.won .gr-flash { animation: gr-flash 0.9s 0.75s ease-out both; }
+.game-result.lost .gr-flash { background: radial-gradient(circle, rgba(255, 90, 60, 0.8), rgba(255, 60, 40, 0) 60%); animation: gr-flash 0.7s 0.5s ease-out both; }
+
+/* SVG parts */
+.gr-emblem g,
+.gr-emblem ellipse {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.gr-leaf { transform: scale(0); animation: gr-grow 0.5s ease-out forwards; }
+.gr-crest { transform: scale(0); animation: gr-pop 0.7s 0.7s cubic-bezier(0.2, 1.6, 0.4, 1) forwards; }
+.gr-stars { opacity: 0; animation: gr-fade 0.5s 1.2s ease-out forwards, gr-twinkle 1.8s 1.7s ease-in-out infinite; }
+.gr-sheen { animation: gr-sheen 3.4s 1.4s ease-in-out infinite; }
+
+.gr-cracks path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: gr-crack 0.55s 0.55s ease-out forwards;
+}
+.gr-cracks path:nth-child(2) { animation-delay: 0.7s; }
+.gr-cracks path:nth-child(3) { animation-delay: 0.78s; }
+.gr-cracks path:nth-child(4) { animation-delay: 0.85s; }
+.game-result.lost .gr-shield-body { animation: gr-sag 4s 1.4s ease-in-out infinite; }
+.gr-sword-top { animation: gr-sword-top 1.4s 0.55s ease-out forwards; }
+.gr-sword-bottom { animation: gr-sword-bottom 1.2s 0.55s ease-out forwards; }
+
+/* Title banner */
+.gr-banner {
+  position: relative;
+  margin-top: 4px;
+  padding: 10px 64px 12px;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 22px) 50%, 100% 100%, 0 100%, 22px 50%);
+  animation: gr-banner 0.7s 0.95s cubic-bezier(0.2, 1.2, 0.4, 1) both;
+}
+.game-result.won .gr-banner { background: linear-gradient(180deg, #d94b2b, #8e2412 55%, #6a180a); box-shadow: inset 0 0 0 3px #f3bf4c; }
+.game-result.lost .gr-banner { background: linear-gradient(180deg, #3a3d46, #1e2026 55%, #121317); box-shadow: inset 0 0 0 3px #6a707c; animation-delay: 0.9s; }
+.gr-banner h2 {
+  margin: 0;
+  font-size: clamp(30px, 6vh, 46px);
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+.game-result.won .gr-banner h2 {
+  background-image: linear-gradient(180deg, #fffbe0, #ffd34d 55%, #d08a1e);
+  filter: drop-shadow(0 0 10px rgba(255, 190, 80, 0.9));
+}
+.game-result.lost .gr-banner h2 {
+  background-image: linear-gradient(180deg, #ffb09a, #e0523a 60%, #8c1c12);
+  animation: gr-flicker 3.2s 1.8s infinite;
+}
+
+.gr-hint {
+  margin: 0 0 8px;
+  color: #f6e2ae;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+  animation: gr-rise-in 0.6s 1.3s ease-out both;
+}
+.game-result.lost .gr-hint { color: #c9b6b0; }
+.gr-btn { animation: gr-rise-in 0.6s 1.5s ease-out both; }
+
+/* Keyframes */
+@keyframes gr-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes gr-spin { to { transform: rotate(360deg); } }
+@keyframes gr-pulse { 0%, 100% { transform: scale(0.92); opacity: 0.75; } 50% { transform: scale(1.08); opacity: 1; } }
+@keyframes gr-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes gr-flash { 0% { opacity: 0; transform: scale(0.4); } 25% { opacity: 1; } 100% { opacity: 0; transform: scale(1.3); } }
+@keyframes gr-drop-win {
+  0% { transform: translateY(-110vh) scale(2.4) rotate(-14deg); opacity: 0; }
+  55% { transform: translateY(10px) scale(0.94) rotate(3deg); opacity: 1; }
+  75% { transform: translateY(-14px) scale(1.04) rotate(-1deg); }
+  100% { transform: translateY(0) scale(1) rotate(0); opacity: 1; }
+}
+@keyframes gr-drop-lose {
+  0% { transform: translateY(-90vh) scale(2.6) rotate(10deg); opacity: 0; }
+  100% { transform: translateY(0) scale(1) rotate(0); opacity: 1; }
+}
+@keyframes gr-shake {
+  10%, 90% { transform: translate(-2px, 1px); }
+  20%, 80% { transform: translate(4px, -2px); }
+  30%, 50%, 70% { transform: translate(-7px, 3px); }
+  40%, 60% { transform: translate(7px, -3px); }
+}
+@keyframes gr-grow { from { transform: scale(0) rotate(-40deg); } to { transform: scale(1) rotate(0); } }
+@keyframes gr-pop { from { transform: scale(0) rotate(-20deg); } to { transform: scale(1) rotate(0); } }
+@keyframes gr-twinkle { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+@keyframes gr-sheen { 0% { transform: translateX(-60px); } 45%, 100% { transform: translateX(300px); } }
+@keyframes gr-crack { to { stroke-dashoffset: 0; } }
+@keyframes gr-sag { 0%, 100% { transform: rotate(-1.5deg); } 50% { transform: rotate(1.5deg) translateY(2px); } }
+@keyframes gr-sword-top { to { transform: translate(24px, -14px) rotate(24deg); opacity: 0.85; } }
+@keyframes gr-sword-bottom { to { transform: translate(-6px, 8px) rotate(-10deg); } }
+@keyframes gr-banner {
+  from { opacity: 0; transform: scaleX(0.2); letter-spacing: 30px; }
+  to { opacity: 1; transform: scaleX(1); }
+}
+@keyframes gr-flicker { 0%, 92%, 100% { opacity: 1; } 94% { opacity: 0.55; } 96% { opacity: 1; } 98% { opacity: 0.7; } }
+@keyframes gr-rise-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes gr-rise {
+  0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translate(var(--drift), -105vh) scale(1.1); opacity: 0; }
+}
+@keyframes gr-fall {
+  0% { transform: translate(0, 0) scale(1); opacity: 0; }
+  15% { opacity: 0.85; }
+  100% { transform: translate(var(--drift), 105vh) scale(0.5); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-result *,
+  .game-result *::before {
+    animation-duration: 0.01s !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+  }
+}

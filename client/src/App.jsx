@@ -8,6 +8,7 @@ import { socketService } from './services/SocketService.js';
 import { audioService } from './services/audioService.js';
 import { MenuBackdrop } from './components/MenuBackdrop.jsx';
 import { MagicLoader } from './components/MagicLoader.jsx';
+import { GameResultOverlay } from './components/GameResultOverlay.jsx';
 import { useSettingsStore } from './store/settingsStore.js';
 import { useT } from './i18n/index.js';
 import './styles/App.css';
@@ -22,6 +23,8 @@ function App() {
   const gameState = useGameStore((state) => state.gameState);
   const roomCode = useGameStore((state) => state.roomCode);
   const players = useGameStore((state) => state.players);
+  const teamSize = useGameStore((state) => state.teamSize);
+  const setTeamSize = useGameStore((state) => state.setTeamSize);
   const currentPlayer = useGameStore((state) => state.currentPlayer);
   const messages = useGameStore((state) => state.messages);
   const [gameResult, setGameResult] = useState(null); // { winnerTeam } once a tower has fallen
@@ -37,11 +40,22 @@ function App() {
     audioService.setEnabled(musicOn);
   }, [musicOn]);
 
-  // Menu music on menu screens, loading music while waiting in the lobby, silence in a match.
+  // Menu music on menu screens, loading music while waiting in the lobby, the map's own music in a match.
   useEffect(() => {
-    const track = gameState === 'in_game' ? null : gameState === 'room_lobby' ? 'loading' : 'menu';
-    audioService.setTrack(track);
-  }, [gameState]);
+    if (gameState === 'in_game') {
+      if (!gameResult) audioService.setMatchMusic(currentMap?.music);
+      return;
+    }
+    audioService.setTrack(gameState === 'room_lobby' ? 'loading' : 'menu');
+  }, [gameState, currentMap, gameResult]);
+
+  // Victory / defeat jingle once the match has been decided.
+  useEffect(() => {
+    if (!gameResult) return;
+    const { players: current } = useGameStore.getState();
+    const myTeamNow = current.find((p) => p.id === socketService.socket?.id)?.team;
+    audioService.playResult(gameResult.winnerTeam === myTeamNow);
+  }, [gameResult]);
 
   // Click sound for every button in the app.
   useEffect(() => {
@@ -72,6 +86,8 @@ function App() {
       console.log('Game started!', data);
       setPlayers(data.players);
       setRoomCode(data.roomCode);
+      setCurrentMap(data.map || null);
+      setCurrentEnvironment(data.environment || null);
       setGameState('in_game');
     });
 
@@ -163,8 +179,8 @@ function App() {
   }, [players, gameState]);
 
   // Handle create room
-  const handleCreateRoom = (playerName, mapId, environment) => {
-    socketService.createRoom(playerName, mapId, environment, useSettingsStore.getState().characterId, (response) => {
+  const handleCreateRoom = (playerName, mapId, environment, match) => {
+    socketService.createRoom(playerName, mapId, environment, useSettingsStore.getState().characterId, match, (response) => {
       if (response.success) {
         console.log('Room created:', response.roomCode);
         setRoomCode(response.roomCode);
@@ -175,7 +191,9 @@ function App() {
           name: playerName
         });
         setPlayers(response.room.players);
-        setGameState('room_lobby');
+        setTeamSize(response.room.teamSize);
+        // A single-player match starts right away (the computer fills the other places)
+        setGameState(response.room.gameState === 'in_progress' ? 'in_game' : 'room_lobby');
       } else {
         alert(response.message);
       }
@@ -196,8 +214,10 @@ function App() {
           name: playerName
         });
         setPlayers(response.room.players);
+        setTeamSize(response.room.teamSize);
+        // Wait in the lobby until every place is taken (the server then sends gameStarted)
         // Scene creation is handled by the gameState effect
-        setGameState('in_game');
+        setGameState(response.room.gameState === 'in_progress' ? 'in_game' : 'room_lobby');
       } else {
         console.error(`[Client] Failed to join room: ${response.message}`);
         alert(t('join.failed', { message: response.message }));
@@ -213,6 +233,7 @@ function App() {
   // Handle leave room
   const handleLeaveRoom = () => {
     setGameResult(null);
+    socketService.leaveRoom();
     reset(); // gameState becomes 'menu'; the effect disposes the scene
   };
 
@@ -237,7 +258,7 @@ function App() {
             <p className="lobby-meta">
               {t('lobby.map')}: {currentMap ? currentMap.name : t('create.defaultMap')}
             </p>
-            <p className="lobby-meta">{t('lobby.players')}: {players.length}/2</p>
+            <p className="lobby-meta">{t('lobby.players')}: {players.length}/{teamSize * 2} ({teamSize}v{teamSize})</p>
             <div className="lobby-players">
               {players.map((player) => (
                 <div key={player.id} className="lobby-player">
@@ -272,15 +293,13 @@ function App() {
             onSendMessage={handleSendMessage}
           />
           {gameResult && (
-            <div className="game-over">
-              <div className={`game-over-box ${won ? 'won' : 'lost'}`}>
-                <h2>{won ? t('game.victory') : t('game.defeat')}</h2>
-                <p>{won ? t('game.victoryHint') : t('game.defeatHint')}</p>
-                <button className="fantasy-btn" onClick={handleLeaveRoom}>
-                  {t('game.backToMenu')}
-                </button>
-              </div>
-            </div>
+            <GameResultOverlay
+              won={won}
+              title={won ? t('game.victory') : t('game.defeat')}
+              hint={won ? t('game.victoryHint') : t('game.defeatHint')}
+              buttonLabel={t('game.backToMenu')}
+              onContinue={handleLeaveRoom}
+            />
           )}
         </>
       )}

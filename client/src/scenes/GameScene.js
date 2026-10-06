@@ -17,6 +17,8 @@ const CAMERA_FOLLOW_SMOOTHING = 8; // higher = camera catches up faster
 const DEFAULT_ARENA_SIZE = 500;
 const NETWORK_SYNC_INTERVAL = 0.05; // seconds between position broadcasts (20Hz)
 const MOVE_EPSILON_SQ = 0.0005; // squared distance threshold to consider a remote player "moving"
+const REMOTE_POSITION_SMOOTHING = 14; // higher = remote players catch up to their network position faster
+const REMOTE_SNAP_DISTANCE_SQ = 30 * 30; // farther than this (teleport) skips the smoothing
 const REMOTE_IDLE_TIMEOUT_MS = 200; // remote player is idle if no movement update arrived within this time
 const SEND_LOCK_MS = 120; // minimum gap between two action requests from the local player
 const DASH_SECONDS = 0.25;
@@ -418,6 +420,7 @@ export class GameScene {
     this.players.set(playerId, {
       playerId,
       mesh: group,
+      targetPosition: group.position.clone(),
       model,
       actor,
       def,
@@ -453,11 +456,12 @@ export class GameScene {
     // A knockback / dash animation is moving this player right now
     if (player.displacement) return;
 
-    const dx = playerData.position.x - player.mesh.position.x;
-    const dz = playerData.position.z - player.mesh.position.z;
+    const dx = playerData.position.x - player.targetPosition.x;
+    const dz = playerData.position.z - player.targetPosition.z;
     const movedDistanceSq = dx * dx + dz * dz;
 
-    player.mesh.position.set(playerData.position.x, 0, playerData.position.z);
+    // Network updates only set the target; updateRemotePlayers() glides the mesh towards it every frame.
+    player.targetPosition.set(playerData.position.x, 0, playerData.position.z);
 
     const isMoving = movedDistanceSq > MOVE_EPSILON_SQ;
     if (isMoving) {
@@ -502,6 +506,20 @@ export class GameScene {
 
   isStunned(player) {
     return performance.now() < player.stunUntil;
+  }
+
+  // Smoothly follows the last received position of remote players (updates arrive at only 10-20Hz).
+  updateRemotePlayers(delta) {
+    const blend = 1 - Math.exp(-REMOTE_POSITION_SMOOTHING * delta);
+    for (const player of this.players.values()) {
+      if (player.isCurrentPlayer || player.displacement || player.dead) continue;
+      const { mesh, targetPosition } = player;
+      if (mesh.position.distanceToSquared(targetPosition) > REMOTE_SNAP_DISTANCE_SQ) {
+        mesh.position.copy(targetPosition);
+      } else {
+        mesh.position.lerp(targetPosition, blend);
+      }
+    }
   }
 
   // Sends the local player's final position once movement stops, so remote clients
@@ -715,6 +733,7 @@ export class GameScene {
       player.mesh.position.lerpVectors(move.from, move.to, 1 - (1 - u) ** 3);
       if (u >= 1) {
         player.displacement = null;
+        player.targetPosition.copy(player.mesh.position);
         if (player.isCurrentPlayer) this.emitPosition(player.mesh.position.x, player.mesh.position.z);
       }
     }
@@ -739,6 +758,7 @@ export class GameScene {
     player.data = { ...player.data, ...data };
     player.actor.endOneShot();
     player.mesh.position.set(data.position.x, 0, data.position.z);
+    player.targetPosition.copy(player.mesh.position);
     player.mesh.visible = true;
     if (player.isCurrentPlayer) {
       this.cameraSnapPending = true;
@@ -852,6 +872,7 @@ export class GameScene {
     const delta = this.clock.getDelta();
     this.updateLocalMovement(delta);
     this.updateDisplacements(delta);
+    this.updateRemotePlayers(delta);
     this.mapObjects.forEach((object) => object.update(delta));
     const now = performance.now();
     for (const player of this.players.values()) {

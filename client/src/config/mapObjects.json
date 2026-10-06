@@ -13,10 +13,26 @@
     {
       "id": "tower",
       "category": "tower",
-      "name": { "en": "Tower (base)", "id": "Menara (base)" },
+      "name": { "en": "Crystal Tower", "id": "Menara Kristal" },
       "model": "map/tower/crystal_tower.glb",
       "size": 20,
       "defaultAnimation": "Armature|Up and Down"
+    },
+    {
+      "id": "tower",
+      "category": "tower",
+      "name": { "en": "Water Tower", "id": "Menara Air" },
+      "model": "map/tower/water_tower.glb",
+      "size": 20,
+      "defaultAnimation": "Animated"
+    },
+    {
+      "id": "tower",
+      "category": "tower",
+      "name": { "en": "Rotate Tower", "id": "Menara Berputar" },
+      "model": "map/tower/rotate_tower.glb",
+      "size": 20,
+      "defaultAnimation": "C4D Animation Take"
     },
     {
       "id": "rimuru_tempest",

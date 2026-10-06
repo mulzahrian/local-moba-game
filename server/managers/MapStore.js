@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { REQUIRED_TOWERS, countTowers } from '../../shared/mapConfig.js';
+import { REQUIRED_TOWERS, countTowers, sanitizeMusic } from '../../shared/mapConfig.js';
 
 export class MapValidationError extends Error {}
 
@@ -48,6 +48,7 @@ export function sanitizeMap(input, id, previous = null) {
     version: 1,
     size: Math.min(Math.max(num(input?.size, 500), 50), 2000),
     ...sanitizeEnvironment(input),
+    music: sanitizeMusic(input?.music),
     createdAt: previous?.createdAt || now,
     updatedAt: now,
     objects: rawObjects.map((o, index) => ({
@@ -90,6 +91,7 @@ class MapStore {
           name: map.name,
           size: map.size,
           ...sanitizeEnvironment(map),
+          music: sanitizeMusic(map.music),
           objectCount: Array.isArray(map.objects) ? map.objects.length : 0,
           createdAt: map.createdAt,
           updatedAt: map.updatedAt

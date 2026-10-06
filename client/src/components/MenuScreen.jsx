@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { PlayView } from './menu/PlayView.jsx';
+import { MultiplayerView } from './menu/MultiplayerView.jsx';
 import { CreateRoomView } from './menu/CreateRoomView.jsx';
 import { JoinRoomView } from './menu/JoinRoomView.jsx';
 import { MapListView } from './menu/MapListView.jsx';
@@ -12,7 +13,7 @@ import { useT } from '../i18n/index.js';
 
 export function MenuScreen({ onCreateRoom, onJoinRoom }) {
   const t = useT();
-  const [view, setView] = useState('main'); // main, play, create, join, maps, editor, characters, character-editor, settings
+  const [view, setView] = useState('main'); // main, play, single, multiplayer, create, join, maps, editor, characters, character-editor, settings
   const [editingMapId, setEditingMapId] = useState(null); // null = new map
   const [editingCharacterId, setEditingCharacterId] = useState(null); // null = new character
 
@@ -28,11 +29,17 @@ export function MenuScreen({ onCreateRoom, onJoinRoom }) {
     case 'play':
       content = <PlayView onNavigate={setView} />;
       break;
+    case 'single':
+      content = <CreateRoomView singlePlayer onBack={() => setView('play')} onCreateRoom={onCreateRoom} />;
+      break;
+    case 'multiplayer':
+      content = <MultiplayerView onNavigate={setView} />;
+      break;
     case 'create':
-      content = <CreateRoomView onBack={() => setView('play')} onCreateRoom={onCreateRoom} />;
+      content = <CreateRoomView onBack={() => setView('multiplayer')} onCreateRoom={onCreateRoom} />;
       break;
     case 'join':
-      content = <JoinRoomView onBack={() => setView('play')} onJoinRoom={onJoinRoom} />;
+      content = <JoinRoomView onBack={() => setView('multiplayer')} onJoinRoom={onJoinRoom} />;
       break;
     case 'maps':
       content = (
