@@ -372,7 +372,7 @@ io.on('connection', (socket) => {
     
     if (room) {
       const player = room.players.find(p => p.id === socket.id);
-      if (player && !player.dead) {
+      if (player && !player.dead && room.gameState !== 'finished') {
         player.position = position;
         io.to(roomCode).emit('playerMoved', {
           playerId: socket.id,
@@ -404,6 +404,10 @@ io.on('connection', (socket) => {
     if (!event) return;
 
     io.to(room.code).emit('skillUsed', { ...event, players: room.players });
+    if (event.winnerTeam) {
+      console.log(`[Combat] ${event.winnerTeam} destroyed the enemy tower in room ${room.code}`);
+      io.to(room.code).emit('gameOver', { winnerTeam: event.winnerTeam });
+    }
     event.hits.filter((hit) => hit.died).forEach((hit) => {
       console.log(`[Combat] ${hit.targetId} was defeated by ${caster.id}`);
       gameManager.scheduleRespawn(room.code, hit.targetId);

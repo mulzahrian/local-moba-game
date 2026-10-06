@@ -1,4 +1,5 @@
 import { MANA_REGEN_PER_SECOND, RESPAWN_SECONDS, getRoleConfig } from '../../shared/characterConfig.js';
+import { DEFAULT_MAP_SIZE, buildTowers, getSpawnPosition, getTowerForTeam } from '../../shared/mapConfig.js';
 
 // Builds a fresh in-room player for the chosen character (role decides health and mana pools).
 function createPlayer(id, name, team, position, character) {
@@ -67,10 +68,16 @@ class GameManager {
       return null;
     }
 
+    const towers = buildTowers(map);
+    const mapSize = map?.size || DEFAULT_MAP_SIZE;
+    const spawn = getSpawnPosition(getTowerForTeam(towers, 'team1'), mapSize);
+
     const room = {
       code: roomCode,
       hostId: hostId,
-      players: [createPlayer(hostId, hostName, 'team1', { x: 0, y: 0, z: 0 }, character)],
+      players: [createPlayer(hostId, hostName, 'team1', spawn, character)],
+      towers, // the two bases; destroying the enemy tower wins the match
+      winnerTeam: null,
 
       map, // full map JSON chosen by the host (null = default arena)
       environment, // { sky, weather } chosen by the host
@@ -107,7 +114,8 @@ class GameManager {
     // Determine team
     const team = room.players.some(p => p.team === 'team1') ? 'team2' : 'team1';
 
-    const newPlayer = createPlayer(playerId, playerName, team, { x: team === 'team1' ? -50 : 50, y: 0, z: -50 }, character);
+    const spawn = getSpawnPosition(getTowerForTeam(room.towers, team), room.map?.size || DEFAULT_MAP_SIZE);
+    const newPlayer = createPlayer(playerId, playerName, team, spawn, character);
 
 
     room.players.push(newPlayer);

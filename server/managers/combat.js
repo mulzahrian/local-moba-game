@@ -21,23 +21,23 @@ function clampToArena(position, limit) {
   };
 }
 
-function isHit(def, caster, dir, target) {
+function isHit(def, caster, dir, target, radius = HIT_RADIUS) {
   const dx = target.position.x - caster.position.x;
   const dz = target.position.z - caster.position.z;
   const distance = Math.hypot(dx, dz);
 
-  if (def.shape === 'circle') return distance - HIT_RADIUS <= def.range;
+  if (def.shape === 'circle') return distance - radius <= def.range;
 
   const forward = dx * dir.x + dz * dir.z;
   if (def.shape === 'cone') {
-    if (distance - HIT_RADIUS > def.range) return false;
-    if (distance < HIT_RADIUS) return true;
+    if (distance - radius > def.range) return false;
+    if (distance < radius) return true;
     const angle = Math.acos(Math.min(1, Math.max(-1, forward / distance)));
     return angle <= ((def.arc || 90) / 2) * (Math.PI / 180);
   }
   if (def.shape === 'line') {
     const lateral = Math.abs(dx * dir.z - dz * dir.x);
-    return forward >= -HIT_RADIUS && forward - HIT_RADIUS <= def.range && lateral <= (def.width || 2) / 2 + HIT_RADIUS;
+    return forward >= -radius && forward - radius <= def.range && lateral <= (def.width || 2) / 2 + radius;
   }
   return false;
 }
@@ -48,7 +48,7 @@ function isHit(def, caster, dir, target) {
  * (or null when the action is not allowed right now).
  */
 export function resolveAction(room, caster, slot, rawDir, now = Date.now()) {
-  if (!caster || caster.dead) return null;
+  if (!caster || caster.dead || room.gameState === 'finished') return null;
   const def = getActionDef(caster.role, slot);
   const dir = normalize(rawDir);
   if (!def || !dir) return null;
@@ -61,7 +61,7 @@ export function resolveAction(room, caster, slot, rawDir, now = Date.now()) {
   caster.mana -= cost;
 
   const limit = getArenaLimit(room);
-  const event = { casterId: caster.id, slot, dir, hits: [], casterPosition: null };
+  const event = { casterId: caster.id, slot, dir, hits: [], towerHits: [], casterPosition: null };
 
   const origin = caster.position; // cones/lines are tested from where the caster started
   if (def.dash) {
@@ -76,6 +76,24 @@ export function resolveAction(room, caster, slot, rawDir, now = Date.now()) {
   }
 
   if (def.damage > 0) {
+    (room.towers || []).forEach((tower) => {
+      if (tower.team === caster.team || tower.health <= 0) return;
+      if (!isHit(def, { position: origin }, dir, tower, tower.radius)) return;
+
+      tower.health = Math.max(0, tower.health - def.damage);
+      event.towerHits.push({
+        towerId: tower.id,
+        damage: def.damage,
+        health: tower.health,
+        destroyed: tower.health <= 0
+      });
+      if (tower.health <= 0 && room.gameState !== 'finished') {
+        room.gameState = 'finished';
+        room.winnerTeam = caster.team;
+        event.winnerTeam = caster.team;
+      }
+    });
+
     room.players.forEach((target) => {
       if (target.id === caster.id || target.team === caster.team || target.dead) return;
       if (!isHit(def, { position: origin }, dir, target)) return;

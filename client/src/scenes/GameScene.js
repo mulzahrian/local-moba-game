@@ -4,7 +4,8 @@ import { Environment, createGroundGeometry, createGroundMaterial } from '../map/
 import { BUILTIN_CHARACTER_ID, COMBO_WINDOW_SECONDS, getActionDef, getAttackType, getManaCost } from '../../../shared/characterConfig.js';
 import { CharacterActor } from '../character/CharacterActor.js';
 import { getCharacterDefinition, loadGltf } from '../character/characterAssets.js';
-import { RUN_SOUND, playActionSound, playReactionSound } from '../character/characterSounds.js';
+import { RUN_SOUND, playActionSound, playPowerSound, playReactionSound } from '../character/characterSounds.js';
+import { buildTowers } from '../../../shared/mapConfig.js';
 import { audioService } from '../services/audioService.js';
 import { EffectManager } from '../character/effects.js';
 
@@ -20,6 +21,7 @@ const REMOTE_IDLE_TIMEOUT_MS = 200; // remote player is idle if no movement upda
 const SEND_LOCK_MS = 120; // minimum gap between two action requests from the local player
 const DASH_SECONDS = 0.25;
 const SOUND_RANGE = 80; // world units from the camera focus beyond which action sounds are silent
+const TEAM_COLORS = { team1: 0xff6b6b, team2: 0x4ecdc4 };
 const KNOCKBACK_SECONDS = 0.3;
 const KNOCKBACK_STUN_MS = 400;
 
@@ -46,6 +48,8 @@ export class GameScene {
     this.setupScene();
     this.setupLights();
     this.mapObjects = [];
+    this.towers = new Map(); // tower id -> { ...tower, root, ring, bar, canvas, color }
+    this.gameOver = false;
     this.setupBoard();
 
     this.players = new Map();
@@ -143,7 +147,7 @@ export class GameScene {
     this.environment = new Environment(this.scene, { ambientLight, sunLight: directionalLight });
   }
 
-  setupBoard(size = DEFAULT_ARENA_SIZE) {
+  setupBoard(size = DEFAULT_ARENA_SIZE, withMarkers = true) {
     if (this.boardGroup) {
       this.scene.remove(this.boardGroup);
       this.boardGroup.traverse((child) => {
@@ -165,12 +169,13 @@ export class GameScene {
     board.rotation.x = -Math.PI / 2;
     this.boardGroup.add(board);
 
-    // Radiant base (bottom-left, green)
-    const baseOffset = size * 0.4;
-    this.createBaseMarker(-baseOffset, 0, -baseOffset, 0x92a825, 'Radiant');
-
-    // Dire base (top-right, red)
-    this.createBaseMarker(baseOffset, 0, baseOffset, 0x922620, 'Dire');
+    // Default bases (bottom-left and top-right); maps with placed towers draw those instead
+    this.markerGroups = {};
+    if (withMarkers) {
+      const baseOffset = size * 0.4;
+      this.markerGroups.team1 = this.createBaseMarker(-baseOffset, 0, -baseOffset, 0x92a825, 'Radiant');
+      this.markerGroups.team2 = this.createBaseMarker(baseOffset, 0, baseOffset, 0x922620, 'Dire');
+    }
 
     // Add some arena walls/boundaries
     this.createWall(-half, 0, 0, size, 'vertical');
@@ -179,18 +184,108 @@ export class GameScene {
     this.createWall(0, 0, half, size, 'horizontal');
   }
 
-  // Rebuilds the arena from a saved map (null keeps the default arena) and places its objects.
+  // Rebuilds the arena from a saved map (null keeps the default arena) and places its objects and towers.
   loadMap(map) {
     this.clearMapObjects();
-    if (!map) return;
+    this.clearTowers();
+    const towers = buildTowers(map);
 
-    this.setupBoard(map.size || DEFAULT_ARENA_SIZE);
-    this.environment.apply(map.sky, map.weather);
-    (map.objects || []).forEach((data) => {
-      const object = new MapObject(data);
-      this.scene.add(object.root);
-      this.mapObjects.push(object);
+    if (map) {
+      this.setupBoard(map.size || DEFAULT_ARENA_SIZE, !towers[0].custom);
+      this.environment.apply(map.sky, map.weather);
+      (map.objects || []).forEach((data) => {
+        const object = new MapObject(data);
+        this.scene.add(object.root);
+        this.mapObjects.push(object);
+      });
+    }
+    this.setupTowers(towers);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Towers: each team's base. Its health bar is drawn above it; destroying the enemy tower wins.
+  // ---------------------------------------------------------------------------
+
+  setupTowers(towers) {
+    this.gameOver = false;
+    towers.forEach((tower) => {
+      const color = TEAM_COLORS[tower.team];
+      const root = tower.custom
+        ? this.mapObjects.find((object) => object.data.uid === tower.id)?.root
+        : this.markerGroups[tower.team];
+
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(tower.radius, tower.radius + 1.5, 48),
+        new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: true, opacity: 0.8 })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(tower.position.x, 0.08, tower.position.z);
+      this.scene.add(ring);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 16;
+      const bar = new THREE.Sprite(
+        new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, depthTest: false })
+      );
+      bar.scale.set(tower.radius * 2.4, tower.radius * 0.3, 1);
+      bar.position.set(tower.position.x, tower.height + 3, tower.position.z);
+      bar.renderOrder = 10;
+      this.scene.add(bar);
+
+      const entry = { ...tower, root, ring, bar, canvas, color };
+      this.towers.set(tower.id, entry);
+      this.drawTowerBar(entry);
     });
+  }
+
+  drawTowerBar(tower) {
+    const ctx = tower.canvas.getContext('2d');
+    const { width, height } = tower.canvas;
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = `#${tower.color.toString(16).padStart(6, '0')}`;
+    ctx.fillRect(2, 2, (width - 4) * (tower.health / tower.maxHealth), height - 4);
+    tower.bar.material.map.needsUpdate = true;
+  }
+
+  // Server broadcast: a tower took damage (and maybe fell).
+  handleTowerHit(hit) {
+    const tower = this.towers.get(hit.towerId);
+    if (!tower) return;
+
+    tower.health = hit.health;
+    this.drawTowerBar(tower);
+    this.spawnFloater(tower.position, `-${hit.damage}`, '#ffb347');
+
+    if (!hit.destroyed) return;
+    if (tower.root) tower.root.visible = false;
+    tower.bar.visible = false;
+    tower.ring.visible = false;
+    const options = { position: { x: tower.position.x, y: 0, z: tower.position.z }, range: tower.radius * 2, shape: 'circle' };
+    this.effects.spawn('fireBurst', options);
+    this.effects.spawn('shockwave', options);
+    playPowerSound('fireBurst', this.soundVolume(tower.position));
+  }
+
+  // The match is decided: nobody can move or act any more.
+  handleGameOver() {
+    this.gameOver = true;
+    const me = this.getCurrentPlayerEntry();
+    if (me) this.setPlayerMoving(me, false);
+  }
+
+  clearTowers() {
+    this.towers.forEach((tower) => {
+      this.scene.remove(tower.ring);
+      this.scene.remove(tower.bar);
+      tower.ring.geometry.dispose();
+      tower.ring.material.dispose();
+      tower.bar.material.map.dispose();
+      tower.bar.material.dispose();
+    });
+    this.towers.clear();
   }
 
   // Overrides the sky/weather chosen for the room (null keeps the current one).
@@ -216,6 +311,7 @@ export class GameScene {
   }
 
   createBaseMarker(x, y, z, color, name) {
+    const group = new THREE.Group();
     // Larger base marker - visible tower-like structure
     const geometry = new THREE.ConeGeometry(20, 40, 32);
     const material = new THREE.MeshStandardMaterial({ color, metalness: 0.4 });
@@ -223,7 +319,7 @@ export class GameScene {
     marker.position.set(x, y, z);
     marker.castShadow = true;
     marker.receiveShadow = true;
-    this.boardGroup.add(marker);
+    group.add(marker);
     
     // Base circle on ground
     const baseGeometry = new THREE.CylinderGeometry(30, 30, 1, 32);
@@ -231,7 +327,10 @@ export class GameScene {
     const base = new THREE.Mesh(baseGeometry, baseMaterial);
     base.position.set(x, 0.5, z);
     base.receiveShadow = true;
-    this.boardGroup.add(base);
+    group.add(base);
+
+    this.boardGroup.add(group);
+    return group;
   }
   addPlayer(playerId, playerData, isCurrentPlayer = false) {
     const existing = this.players.get(playerId);
@@ -428,7 +527,7 @@ export class GameScene {
     const player = this.getCurrentPlayerEntry();
     if (!player) return;
 
-    if (player.dead || player.displacement || this.isStunned(player)) {
+    if (player.dead || this.gameOver || player.displacement || this.isStunned(player)) {
       this.setPlayerMoving(player, false);
       return;
     }
@@ -500,7 +599,7 @@ export class GameScene {
   performAction(request) {
     const me = this.getCurrentPlayerEntry();
     const now = performance.now();
-    if (!me || me.dead || this.isStunned(me) || me.displacement || now < me.sendLockUntil) return;
+    if (!me || me.dead || this.gameOver || this.isStunned(me) || me.displacement || now < me.sendLockUntil) return;
 
     let slot = request;
     if (request === 'attack') {
@@ -569,6 +668,7 @@ export class GameScene {
     }
 
     event.hits.forEach((hit) => this.applyHit(hit));
+    (event.towerHits || []).forEach((hit) => this.handleTowerHit(hit));
   }
 
   // Skills use the effect picked in the character generator; basic attacks get a light default one.
@@ -784,6 +884,7 @@ export class GameScene {
     while (this.floaters.length) this.removeFloater(this.floaters.length - 1);
     this.players.forEach((player) => player.actor.dispose());
     this.clearMapObjects();
+    this.clearTowers();
     this.renderer.dispose();
     if (this.container.contains(this.renderer.domElement)) {
       this.container.removeChild(this.renderer.domElement);

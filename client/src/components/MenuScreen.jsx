@@ -78,5 +78,5 @@ export function MenuScreen({ onCreateRoom, onJoinRoom }) {
       );
   }
 
-  return <MenuBackdrop>{content}</MenuBackdrop>;
+  return <MenuBackdrop wide={view === 'play'}>{content}</MenuBackdrop>;
 }

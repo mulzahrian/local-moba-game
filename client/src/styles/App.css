@@ -9,6 +9,31 @@
   background: #0a0a0a;
 }
 
+.game-over {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.game-over-box {
+  min-width: 320px;
+  padding: 32px 44px;
+  text-align: center;
+  color: #f6e2ae;
+  background: rgba(20, 12, 5, 0.95);
+  border: 3px solid #d9a94a;
+  border-radius: 8px;
+}
+
+.game-over-box h2 { margin: 0 0 8px; font-size: 40px; letter-spacing: 4px; text-transform: uppercase; }
+.game-over-box.won h2 { color: #ffd34d; text-shadow: 0 0 16px rgba(255, 190, 80, 0.8); }
+.game-over-box.lost h2 { color: #ff8a70; }
+.game-over-box p { margin: 0 0 22px; }
+
 /* Lobby Screen */
 .lobby-container {
   width: 100%;

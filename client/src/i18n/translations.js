@@ -94,7 +94,12 @@ export const translations = {
     'editor.weather.rain': 'Rain',
     'editor.mapSize': 'Map size',
     'editor.count': 'Objects placed: {count}',
-    'editor.towerCount': 'Towers: {count} / {required}',
+    'editor.towerCount': 'Towers: {count} / {required} (1st = host base, 2nd = guest base)',
+    'game.victory': 'Victory!',
+    'game.defeat': 'Defeat',
+    'game.victoryHint': "You destroyed the enemy tower.",
+    'game.defeatHint': 'Your tower was destroyed.',
+    'game.backToMenu': 'Back to menu',
     'editor.towerError': 'Cannot save: the map needs exactly {required} towers (currently {count}).',
     'editor.preview': 'Preview',
     'editor.exitPreview': 'Back to editor',
@@ -186,6 +191,7 @@ export const translations = {
     'pick.confirm': 'Start',
     'pick.loadError': 'Could not load characters. Is the server running?',
     'pick.builtin': 'Default hero',
+    'pick.selectHint': 'Select a hero to see its 3D model',
 
     'hud.mana': 'Mana',
 
@@ -281,7 +287,12 @@ export const translations = {
     'editor.weather.rain': 'Hujan',
     'editor.mapSize': 'Ukuran peta',
     'editor.count': 'Objek terpasang: {count}',
-    'editor.towerCount': 'Menara: {count} / {required}',
+    'editor.towerCount': 'Menara: {count} / {required} (ke-1 = base host, ke-2 = base tamu)',
+    'game.victory': 'Menang!',
+    'game.defeat': 'Kalah',
+    'game.victoryHint': 'Kamu menghancurkan menara musuh.',
+    'game.defeatHint': 'Menaramu dihancurkan.',
+    'game.backToMenu': 'Kembali ke menu',
     'editor.towerError': 'Tidak bisa menyimpan: peta harus punya tepat {required} menara (saat ini {count}).',
     'editor.preview': 'Pratinjau',
     'editor.exitPreview': 'Kembali ke editor',
@@ -373,6 +384,7 @@ export const translations = {
     'pick.confirm': 'Mulai',
     'pick.loadError': 'Gagal memuat karakter. Apakah server berjalan?',
     'pick.builtin': 'Pahlawan bawaan',
+    'pick.selectHint': 'Pilih pahlawan untuk melihat model 3D-nya',
 
     'hud.mana': 'Mana',
 

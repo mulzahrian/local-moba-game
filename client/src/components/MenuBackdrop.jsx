@@ -7,7 +7,7 @@ import '@fontsource/cinzel/800.css';
 import '../styles/Menu.css';
 
 // Shared fantasy menu shell: background art, fire glow, rising embers and the game title.
-export function MenuBackdrop({ children }) {
+export function MenuBackdrop({ children, wide = false }) {
   const t = useT();
   return (
     <div className="menu-container" style={{ backgroundImage: `url(${backgroundUrl})` }}>
@@ -15,7 +15,7 @@ export function MenuBackdrop({ children }) {
       <div className="menu-fire-glow" />
       <EmberCanvas />
 
-      <div className="menu-content">
+      <div className={`menu-content ${wide ? 'wide' : ''}`}>
         <div className="menu-header">
           <div className="title-ornament" />
           <h1 className="title">{t('app.title')}</h1>

@@ -24,6 +24,7 @@ function App() {
   const players = useGameStore((state) => state.players);
   const currentPlayer = useGameStore((state) => state.currentPlayer);
   const messages = useGameStore((state) => state.messages);
+  const [gameResult, setGameResult] = useState(null); // { winnerTeam } once a tower has fallen
 
   const setGameState = useGameStore((state) => state.setGameState);
   const setRoomCode = useGameStore((state) => state.setRoomCode);
@@ -101,6 +102,11 @@ function App() {
 
     socketService.on('playerDied', (data) => {
       if (gameSceneRef.current) gameSceneRef.current.handlePlayerDied(data.playerId);
+    });
+
+    socketService.on('gameOver', (data) => {
+      if (gameSceneRef.current) gameSceneRef.current.handleGameOver();
+      setGameResult({ winnerTeam: data.winnerTeam });
     });
 
     socketService.on('playerRespawned', (data) => {
@@ -206,8 +212,12 @@ function App() {
 
   // Handle leave room
   const handleLeaveRoom = () => {
+    setGameResult(null);
     reset(); // gameState becomes 'menu'; the effect disposes the scene
   };
+
+  const myTeam = players.find((p) => p.id === socketService.socket?.id)?.team;
+  const won = gameResult && gameResult.winnerTeam === myTeam;
 
   return (
     <div className="app-container">
@@ -261,6 +271,17 @@ function App() {
             messages={messages}
             onSendMessage={handleSendMessage}
           />
+          {gameResult && (
+            <div className="game-over">
+              <div className={`game-over-box ${won ? 'won' : 'lost'}`}>
+                <h2>{won ? t('game.victory') : t('game.defeat')}</h2>
+                <p>{won ? t('game.victoryHint') : t('game.defeatHint')}</p>
+                <button className="fantasy-btn" onClick={handleLeaveRoom}>
+                  {t('game.backToMenu')}
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

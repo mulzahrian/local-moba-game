@@ -76,6 +76,13 @@ export class CharacterPreviewScene {
     this.scene.add(this.actor.model);
   }
 
+  clearCharacter() {
+    if (!this.actor) return;
+    this.scene.remove(this.actor.model);
+    this.actor.dispose();
+    this.actor = null;
+  }
+
   setAnimations(animations) {
     this.actor?.setAnimations(animations);
   }
