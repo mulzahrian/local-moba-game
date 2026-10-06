@@ -15,6 +15,8 @@ class AudioService {
     this.clickAudio = new Audio(buttonClickUrl);
     this.clickAudio.volume = 0.7;
     this.enabled = true;
+    this.sfxCache = new Map();
+    this.loops = new Map();
     this.current = null; // 'menu' | 'loading' | null
     this.unlockBound = false;
     this.unlock = this.unlock.bind(this);
@@ -61,6 +63,7 @@ class AudioService {
 
   setEnabled(enabled) {
     this.enabled = enabled;
+    if (!enabled) [...this.loops.keys()].forEach((key) => this.stopLoop(key));
     this.sync();
   }
 
@@ -76,6 +79,37 @@ class AudioService {
     const sfx = this.clickAudio.cloneNode();
     sfx.volume = this.clickAudio.volume;
     sfx.play().catch(() => {});
+  }
+
+  // One-shot sound effect; `volume` is 0-1 on top of the effect's own base level.
+  playSfx(url, volume = 1) {
+    if (!this.enabled || !url || volume <= 0.01) return;
+    let base = this.sfxCache.get(url);
+    if (!base) {
+      base = new Audio(url);
+      base.preload = 'auto';
+      this.sfxCache.set(url, base);
+    }
+    const sfx = base.cloneNode();
+    sfx.volume = Math.min(1, volume);
+    sfx.play().catch(() => {});
+  }
+
+  // Looping effect (e.g. footsteps) identified by `key`; no-op if it is already running.
+  startLoop(key, url, volume = 1) {
+    if (!this.enabled || this.loops.has(key)) return;
+    const audio = new Audio(url);
+    audio.loop = true;
+    audio.volume = Math.min(1, volume);
+    audio.play().catch(() => {});
+    this.loops.set(key, audio);
+  }
+
+  stopLoop(key) {
+    const audio = this.loops.get(key);
+    if (!audio) return;
+    audio.pause();
+    this.loops.delete(key);
   }
 }
 

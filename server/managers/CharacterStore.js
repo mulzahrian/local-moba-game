@@ -3,11 +3,16 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import {
   ANIMATION_SLOTS,
+  ATTACK_SLOTS,
+  DEFAULT_ATTACK_TYPE,
+  DEFAULT_GENDER,
   DEFAULT_ROLE,
   EFFECT_IDS,
   MAX_ANIMATION_NAME,
   SKILL_SLOTS,
   getRoleConfig,
+  isValidAttackType,
+  isValidGender,
   isValidRole
 } from '../../shared/characterConfig.js';
 
@@ -74,13 +79,21 @@ export function sanitizeCharacter(input, id, previous = null) {
     effects[slot] = EFFECT_IDS.includes(value) ? value : roleSkills[slot].effect;
   });
 
+  const attackTypes = {};
+  ATTACK_SLOTS.forEach((slot) => {
+    const value = input?.attackTypes?.[slot];
+    attackTypes[slot] = isValidAttackType(value) ? value : previous?.attackTypes?.[slot] || DEFAULT_ATTACK_TYPE;
+  });
+
   return {
     id,
     name: str(input?.name, 40).trim() || 'Unnamed Hero',
     role,
+    gender: isValidGender(input?.gender) ? input.gender : previous?.gender || DEFAULT_GENDER,
     scale: Math.min(Math.max(num(input?.scale, 1), 0.1), 10),
     animations,
     effects,
+    attackTypes,
     hasModel: previous?.hasModel || false,
     imageExt: previous?.imageExt || null,
     createdAt: previous?.createdAt || now,

@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import { MapObject } from '../map/mapAssets.js';
 import { Environment, createGroundGeometry, createGroundMaterial } from '../map/environment.js';
-import { BUILTIN_CHARACTER_ID, COMBO_WINDOW_SECONDS, getActionDef, getManaCost } from '../../../shared/characterConfig.js';
+import { BUILTIN_CHARACTER_ID, COMBO_WINDOW_SECONDS, getActionDef, getAttackType, getManaCost } from '../../../shared/characterConfig.js';
 import { CharacterActor } from '../character/CharacterActor.js';
 import { getCharacterDefinition, loadGltf } from '../character/characterAssets.js';
+import { RUN_SOUND, playActionSound, playReactionSound } from '../character/characterSounds.js';
+import { audioService } from '../services/audioService.js';
 import { EffectManager } from '../character/effects.js';
 
 const UNIT_SCALE = 0.25; // characters are drawn at 0.25x relative to the map; scales character-attached helpers
@@ -17,6 +19,7 @@ const MOVE_EPSILON_SQ = 0.0005; // squared distance threshold to consider a remo
 const REMOTE_IDLE_TIMEOUT_MS = 200; // remote player is idle if no movement update arrived within this time
 const SEND_LOCK_MS = 120; // minimum gap between two action requests from the local player
 const DASH_SECONDS = 0.25;
+const SOUND_RANGE = 80; // world units from the camera focus beyond which action sounds are silent
 const KNOCKBACK_SECONDS = 0.3;
 const KNOCKBACK_STUN_MS = 400;
 
@@ -375,10 +378,20 @@ export class GameScene {
     this.pendingPlayers.delete(playerId);
   }
 
+  // Sounds fade out with the distance from the camera focus (the local player).
+  soundVolume(position) {
+    const distance = Math.hypot(position.x - this.cameraFocus.x, position.z - this.cameraFocus.z);
+    return Math.max(0, 1 - distance / SOUND_RANGE);
+  }
+
   setPlayerMoving(player, isMoving) {
     if (player.isMoving === isMoving) return;
     player.isMoving = isMoving;
     player.actor.setMoving(isMoving);
+    if (player.isCurrentPlayer) {
+      if (isMoving) audioService.startLoop('run', RUN_SOUND, 0.5);
+      else audioService.stopLoop('run');
+    }
   }
 
   getCurrentPlayerEntry() {
@@ -541,6 +554,7 @@ export class GameScene {
       }
 
       const effectId = this.getEffectId(caster, event.slot, def);
+      playActionSound(caster.def, event.slot, effectId, this.soundVolume(caster.mesh.position));
       if (def && effectId) {
         this.effects.spawn(effectId, {
           position: caster.mesh.position,
@@ -562,6 +576,7 @@ export class GameScene {
     const chosen = caster.def.effects?.[slot];
     if (chosen) return chosen === 'none' ? null : chosen;
     if (slot === 'attack1' || slot === 'attack2') {
+      if (getAttackType(caster.def, slot) === 'punch' && def?.shape === 'cone') return null; // no blade trail for fists
       if (def?.shape === 'cone') return 'slashArc';
       if (def?.shape === 'line') return 'arrowVolley';
     }
@@ -576,6 +591,7 @@ export class GameScene {
     this.spawnFloater(target.mesh.position, `-${hit.damage}`, '#ff6b6b');
 
     if (!target.actor.play(hit.reaction)) target.actor.play('hit');
+    playReactionSound(target.def, hit.reaction, this.soundVolume(target.mesh.position));
     if (hit.reaction !== 'hit') this.displace(target, hit.position, KNOCKBACK_SECONDS, KNOCKBACK_STUN_MS);
   }
 
@@ -757,6 +773,7 @@ export class GameScene {
   dispose() {
     this.disposed = true;
     cancelAnimationFrame(this.frameId);
+    audioService.stopLoop('run');
     this.environment.dispose();
     this.container.removeEventListener('mousedown', this.onMouseDown);
     this.container.removeEventListener('mousemove', this.onMove);

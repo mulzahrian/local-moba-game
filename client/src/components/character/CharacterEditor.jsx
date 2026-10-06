@@ -1,8 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ANIMATION_SLOTS,
+  ATTACK_SLOTS,
+  ATTACK_TYPES,
+  DEFAULT_ATTACK_TYPE,
+  DEFAULT_GENDER,
   DEFAULT_ROLE,
   EFFECT_IDS,
+  GENDERS,
   ROLES,
   SKILL_SLOTS,
   getActionDef,
@@ -34,6 +39,8 @@ const defaultEffects = (role) =>
 
 const emptyAnimations = () => Object.fromEntries(ANIMATION_SLOTS.map((slot) => [slot, null]));
 
+const defaultAttackTypes = () => Object.fromEntries(ATTACK_SLOTS.map((slot) => [slot, DEFAULT_ATTACK_TYPE]));
+
 /**
  * Two-step character creator: (1) name, role, GLB model and profile image; (2) pick which clip of the
  * GLB plays for every action and which effect each skill uses, previewed live on the 3D character.
@@ -46,6 +53,8 @@ export function CharacterEditor({ characterId, onExit }) {
   const [savedId, setSavedId] = useState(characterId);
   const [name, setName] = useState('');
   const [role, setRole] = useState(DEFAULT_ROLE);
+  const [gender, setGender] = useState(DEFAULT_GENDER);
+  const [attackTypes, setAttackTypes] = useState(defaultAttackTypes);
   const [scale, setScale] = useState(1);
   const [animations, setAnimations] = useState(emptyAnimations);
   const [effects, setEffects] = useState(() => defaultEffects(DEFAULT_ROLE));
@@ -89,6 +98,8 @@ export function CharacterEditor({ characterId, onExit }) {
         if (cancelled) return;
         setName(character.name);
         setRole(character.role);
+        setGender(character.gender || DEFAULT_GENDER);
+        setAttackTypes({ ...defaultAttackTypes(), ...character.attackTypes });
         setScale(character.scale || 1);
         setAnimations({ ...emptyAnimations(), ...character.animations });
         setEffects({ ...defaultEffects(character.role), ...character.effects });
@@ -124,6 +135,7 @@ export function CharacterEditor({ characterId, onExit }) {
     if (step !== 'animate' || !gltf || !viewportRef.current) return undefined;
     const preview = new CharacterPreviewScene(viewportRef.current);
     preview.setCharacter(gltf, { animations, scale });
+    preview.setProfile({ gender, attackTypes });
     appliedScaleRef.current = scale;
     previewRef.current = preview;
     return () => {
@@ -143,6 +155,21 @@ export function CharacterEditor({ characterId, onExit }) {
   }, [scale]);
 
   const touch = () => setDirty(true);
+
+  const changeGender = (next) => {
+    setGender(next);
+    touch();
+    previewRef.current?.setProfile({ gender: next, attackTypes });
+    previewRef.current?.playSlot('hit');
+  };
+
+  const changeAttackType = (slot, type) => {
+    const next = { ...attackTypes, [slot]: type };
+    setAttackTypes(next);
+    touch();
+    previewRef.current?.setProfile({ gender, attackTypes: next });
+    previewRef.current?.playSlot(slot);
+  };
 
   const pickModel = async (file) => {
     if (!file) return;
@@ -198,7 +225,7 @@ export function CharacterEditor({ characterId, onExit }) {
   const save = async () => {
     setSaving(true);
     try {
-      const payload = { name: name.trim(), role, scale, animations, effects };
+      const payload = { name: name.trim(), role, gender, attackTypes, scale, animations, effects };
       let saved = savedId ? await characterApi.update(savedId, payload) : await characterApi.create(payload);
       setSavedId(saved.id); // a retry after a failed upload updates instead of creating a duplicate
       if (modelFile) {
@@ -291,6 +318,17 @@ export function CharacterEditor({ characterId, onExit }) {
             </div>
 
             <div className="ce-field">
+              <span className="ce-label">{t('char.gender')}</span>
+              <div className="ce-roles">
+                {GENDERS.map((g) => (
+                  <button key={g} className={`ce-role ${gender === g ? 'active' : ''}`} onClick={() => changeGender(g)}>
+                    {t(`gender.${g}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="ce-field">
               <span className="ce-label">{t('char.roleSkills')}</span>
               <RoleSkills role={role} />
             </div>
@@ -348,6 +386,16 @@ export function CharacterEditor({ characterId, onExit }) {
                     <option key={clip} value={clip}>{clip}</option>
                   ))}
                 </select>
+                {ATTACK_SLOTS.includes(slot) && (
+                  <div className="ce-effect-row">
+                    <span className="ce-skill-name">{t('char.attackType')}</span>
+                    <select value={attackTypes[slot]} onChange={(e) => changeAttackType(slot, e.target.value)}>
+                      {ATTACK_TYPES.map((type) => (
+                        <option key={type} value={type}>{t(`attackType.${type}`)}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 {isSkill && (
                   <div className="ce-effect-row">
                     <span className="ce-skill-name">

@@ -23,6 +23,19 @@ export const ANIMATION_SLOTS = [
 
 export const SKILL_SLOTS = ['skill1', 'skill2', 'skill3'];
 
+// Decide which voice plays when the character is hurt, and which sound / look a basic attack gets.
+export const GENDERS = ['male', 'female'];
+export const DEFAULT_GENDER = 'male';
+export const ATTACK_TYPES = ['sword', 'punch'];
+export const DEFAULT_ATTACK_TYPE = 'sword';
+export const ATTACK_SLOTS = ['attack1', 'attack2'];
+
+export const isValidGender = (value) => GENDERS.includes(value);
+export const isValidAttackType = (value) => ATTACK_TYPES.includes(value);
+export const getGender = (def) => (isValidGender(def?.gender) ? def.gender : DEFAULT_GENDER);
+export const getAttackType = (def, slot) =>
+  isValidAttackType(def?.attackTypes?.[slot]) ? def.attackTypes[slot] : DEFAULT_ATTACK_TYPE;
+
 // Everything the player can trigger with an input (slot -> default key label).
 export const ACTION_SLOTS = ['attack1', 'attack2', 'skill1', 'skill2', 'skill3', 'emote', 'jump'];
 

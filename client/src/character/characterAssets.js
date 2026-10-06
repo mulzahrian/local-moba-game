@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { BUILTIN_CHARACTER_ID, DEFAULT_ROLE, getRoleConfig } from '../../../shared/characterConfig.js';
+import { BUILTIN_CHARACTER_ID, DEFAULT_GENDER, DEFAULT_ROLE, getRoleConfig } from '../../../shared/characterConfig.js';
 import builtinModelUrl from '../model/rimuru_tempest.glb?url';
 import { characterApi } from './characterApi.js';
 
@@ -13,6 +13,8 @@ const BUILTIN_CHARACTER = {
   role: DEFAULT_ROLE,
   builtin: true,
   hasModel: true,
+  gender: DEFAULT_GENDER,
+  attackTypes: { attack1: 'punch', attack2: 'punch' },
   modelUrl: builtinModelUrl,
   imageUrl: null,
   scale: 1,

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { CharacterActor } from './CharacterActor.js';
 import { EffectManager } from './effects.js';
+import { playActionSound, playPowerSound, playReactionSound } from './characterSounds.js';
 
 const PREVIEW_EFFECT_RANGE = 9; // real skill ranges are too large to frame in the small preview
 
@@ -46,6 +47,7 @@ export class CharacterPreviewScene {
 
     this.effects = new EffectManager(this.scene);
     this.actor = null;
+    this.profile = null;
     this.gltf = null;
     this.clock = new THREE.Clock();
 
@@ -78,7 +80,12 @@ export class CharacterPreviewScene {
     this.actor?.setAnimations(animations);
   }
 
-  // Plays the clip assigned to `slot` (idle / run loop, everything else plays once).
+  // Gender and attack types decide which voice / attack sounds the preview plays.
+  setProfile(profile) {
+    this.profile = profile;
+  }
+
+  // Plays the clip assigned to `slot` (idle / run loop, everything else plays once) and its sound.
   playSlot(slot) {
     if (!this.actor) return false;
     if (slot === 'idle' || slot === 'run') {
@@ -86,11 +93,14 @@ export class CharacterPreviewScene {
       this.actor.setMoving(slot === 'run');
       return this.actor.hasAnimation(slot);
     }
+    playActionSound(this.profile, slot, null);
+    playReactionSound(this.profile, slot);
     return this.actor.play(slot);
   }
 
   playEffect(id, def) {
     if (!id || id === 'none' || !this.actor) return;
+    playPowerSound(id);
     this.effects.spawn(id, {
       position: { x: 0, y: 0, z: 0 },
       rotationY: 0,
