@@ -1,59 +1,86 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
-import registry from '../config/mapObjects.json';
+import { objectApi } from './objectApi.js';
 
 const DEFAULT_FIT_SIZE = 10;
 
-// Every .glb under src/model is bundled by Vite; the registry refers to them by relative path.
-const modelUrls = import.meta.glob('../model/**/*.glb', { eager: true, as: 'url' });
-const urlByPath = {};
-Object.entries(modelUrls).forEach(([key, url]) => {
-  urlByPath[key.replace('../model/', '')] = url;
-});
+// ---------------------------------------------------------------------------
+// Object library (Map Generator > Objects): main objects become categories, their sub objects become
+// placeable definitions. Every object in the game comes from here; it is loaded from the server and
+// shared by the editor and the game.
+// ---------------------------------------------------------------------------
 
-const categories = registry.categories || [];
-const categoryIds = new Set(categories.map((c) => c.id));
+const CUSTOM_PREFIX = 'custom:';
+let customCategories = [];
+let customDefinitions = new Map();
+let libraryPromise = null;
 
-function buildDefinitions() {
-  const definitions = new Map();
-  (registry.objects || []).forEach((def) => {
-    definitions.set(def.id, { ...def, category: def.category || 'props' });
-  });
-
-  // GLBs dropped into src/model/map/<category>/ show up automatically even without a registry entry.
-  const registeredModels = new Set((registry.objects || []).map((o) => o.model));
-  Object.keys(urlByPath).forEach((path) => {
-    if (!path.startsWith('map/') || registeredModels.has(path)) return;
-    const relative = path.slice('map/'.length);
-    const folder = relative.includes('/') ? relative.split('/')[0] : 'props';
-    const id = relative.replace(/\.glb$/i, '');
-    if (definitions.has(id)) return;
-    const fileName = relative.split('/').pop().replace(/\.glb$/i, '');
-    const label = fileName.replace(/[_-]+/g, ' ');
-    definitions.set(id, {
-      id,
-      category: categoryIds.has(folder) ? folder : 'props',
-      name: { en: label, id: label },
-      model: path,
-      auto: true
+function applyLibrary(groups) {
+  customCategories = [];
+  customDefinitions = new Map();
+  groups.forEach((group) => {
+    const category = `${CUSTOM_PREFIX}${group.id}`;
+    customCategories.push({
+      id: category,
+      custom: true,
+      logoUrl: group.logoUrl,
+      name: { en: group.name, id: group.name }
     });
+    group.objects
+      .filter((object) => object.hasModel)
+      .forEach((object) => {
+        const id = `${category}:${object.id}`;
+        customDefinitions.set(id, {
+          id,
+          category,
+          name: object.name,
+          modelUrl: object.modelUrl,
+          size: object.size,
+          yOffset: object.yOffset,
+          rotationY: object.rotationY,
+          defaultAnimation: object.defaultAnimation || '',
+          tower: group.tower
+        });
+      });
   });
-  return definitions;
 }
 
-const definitions = buildDefinitions();
+function fetchLibrary() {
+  return objectApi
+    .list()
+    .then(applyLibrary)
+    .catch((error) => {
+      console.error('[MapAssets] Could not load the object library:', error);
+      applyLibrary([]);
+    });
+}
+
+// Loads the library once; later calls reuse the result until it is refreshed / invalidated.
+export function ensureObjectLibrary() {
+  if (!libraryPromise) libraryPromise = fetchLibrary();
+  return libraryPromise;
+}
+
+export function refreshObjectLibrary() {
+  libraryPromise = fetchLibrary();
+  return libraryPromise;
+}
+
+export function invalidateObjectLibrary() {
+  libraryPromise = null;
+}
 
 export function getCategories() {
-  return categories;
+  return customCategories;
 }
 
 export function getObjectDefinitions() {
-  return Array.from(definitions.values());
+  return [...customDefinitions.values()];
 }
 
 export function getObjectDefinition(id) {
-  return definitions.get(id) || null;
+  return customDefinitions.get(id) || null;
 }
 
 export function localizedName(def, language) {
@@ -86,9 +113,10 @@ function loadModel(url) {
   return modelCache.get(url);
 }
 
-// Returns the names of the animation clips contained in the object's model.
-export async function getAnimationNames(def) {
-  const url = def && urlByPath[def.model];
+const modelUrlOf = (def) => def?.modelUrl || null;
+
+// Returns the names of the animation clips contained in a model.
+export async function getModelAnimationNames(url) {
   if (!url) return [];
   try {
     const { gltf } = await loadModel(url);
@@ -97,6 +125,9 @@ export async function getAnimationNames(def) {
     return [];
   }
 }
+
+// Returns the names of the animation clips contained in the object's model.
+export const getAnimationNames = (def) => getModelAnimationNames(modelUrlOf(def));
 
 function createPlaceholder(def) {
   const size = def?.size || DEFAULT_FIT_SIZE;
@@ -118,7 +149,7 @@ function createPlaceholder(def) {
 export class MapObject {
   constructor(data) {
     this.data = data;
-    this.def = getObjectDefinition(data.type);
+    this.def = getObjectDefinition(data.type); // re-resolved in load(), once the library is loaded
     this.root = new THREE.Group();
     this.root.userData.uid = data.uid;
     this.mixer = null;
@@ -130,7 +161,10 @@ export class MapObject {
   }
 
   async load() {
-    const url = this.def && urlByPath[this.def.model];
+    await ensureObjectLibrary(); // objects are only known once the library is loaded
+    if (this.disposed) return;
+    this.def = getObjectDefinition(this.data.type);
+    const url = modelUrlOf(this.def);
     let model;
     if (!url) {
       model = createPlaceholder(this.def);
@@ -139,7 +173,7 @@ export class MapObject {
         const { gltf, box, maxSide } = await loadModel(url);
         if (this.disposed) return;
         model = SkeletonUtils.clone(gltf.scene);
-        const fit = this.def.scale ?? (this.def.size || DEFAULT_FIT_SIZE) / maxSide;
+        const fit = (this.def.size || DEFAULT_FIT_SIZE) / maxSide;
         model.scale.setScalar(fit);
         model.position.y = -box.min.y * fit + (this.def.yOffset || 0);
         model.rotation.y = THREE.MathUtils.degToRad(this.def.rotationY || 0);
@@ -151,7 +185,7 @@ export class MapObject {
         });
         this.clips = gltf.animations;
       } catch (error) {
-        console.error(`[MapObject] Failed to load "${this.def.model}":`, error);
+        console.error(`[MapObject] Failed to load "${this.def.id}":`, error);
         model = createPlaceholder(this.def);
       }
     }

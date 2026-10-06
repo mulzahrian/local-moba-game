@@ -1,0 +1,65 @@
+{
+  "_readme": "Default map objects. They are installed once into the object library (server/data/objects) on server start, after which they are managed in Map Generator > Objects like any uploaded object. 'model' is relative to this folder. 'legacyTypes' are the object types old maps used before the library existed; maps are rewritten to the new type automatically.",
+  "groups": [
+    {
+      "id": "default-towers",
+      "name": "Towers",
+      "tower": true,
+      "objects": [
+        {
+          "id": "crystal-tower",
+          "name": "Crystal Tower",
+          "model": "towers/crystal_tower.glb",
+          "size": 20,
+          "defaultAnimation": "Armature|Up and Down",
+          "legacyTypes": ["tower/crystal_tower"]
+        },
+        {
+          "id": "water-tower",
+          "name": "Water Tower",
+          "model": "towers/water_tower.glb",
+          "size": 20,
+          "defaultAnimation": "Animated",
+          "legacyTypes": ["tower/water_tower"]
+        },
+        {
+          "id": "rotate-tower",
+          "name": "Rotate Tower",
+          "model": "towers/rotate_tower.glb",
+          "size": 20,
+          "defaultAnimation": "C4D Animation Take",
+          "legacyTypes": ["tower/rotate_tower", "tower"]
+        }
+      ]
+    },
+    {
+      "id": "default-trees",
+      "name": "Trees",
+      "tower": false,
+      "objects": [
+        {
+          "id": "tree1",
+          "name": "Tree 1",
+          "model": "trees/tree1.glb",
+          "size": 10,
+          "legacyTypes": ["tree/tree1", "tree1"]
+        }
+      ]
+    },
+    {
+      "id": "default-creatures",
+      "name": "Creatures",
+      "tower": false,
+      "objects": [
+        {
+          "id": "rimuru-tempest",
+          "name": "Rimuru Tempest",
+          "model": "creatures/rimuru_tempest.glb",
+          "size": 13.8,
+          "defaultAnimation": "lml_anim_idle",
+          "legacyTypes": ["rimuru_tempest"]
+        }
+      ]
+    }
+  ]
+}

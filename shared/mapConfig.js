@@ -1,10 +1,12 @@
 ﻿// Map rules shared by the map editor (client), the map API and the game server.
 
 // Every map needs exactly this many towers: the two team bases (spawn point and the objective to destroy).
-export const TOWER_TYPE = 'tower';
 export const REQUIRED_TOWERS = 2;
 
-export const countTowers = (objects) => (objects || []).filter((o) => o?.type === TOWER_TYPE).length;
+// Objects from a "tower" main object in the object library carry `tower: true` when placed.
+export const isTowerObject = (object) => object?.tower === true;
+
+export const countTowers = (objects) => (objects || []).filter(isTowerObject).length;
 
 // Background music a map can play during a match (files in client/src/music/play-list); 'none' = silent.
 export const MUSIC_NONE = 'none';
@@ -15,7 +17,7 @@ export const sanitizeMusic = (music) => (MAP_MUSIC_TRACKS.includes(music) ? musi
 
 export const DEFAULT_MAP_SIZE = 500;
 export const TOWER_MAX_HEALTH = 300;
-export const TOWER_MODEL_HEIGHT = 20; // the tower model is auto-fitted to this size (see mapObjects.json) before its scale
+export const TOWER_MODEL_HEIGHT = 20; // towers are auto-fitted to this size (default size of tower objects) before their scale
 export const TOWER_RADIUS_PER_SCALE = 8; // approximate footprint radius used for hit detection and spawning
 const FALLBACK_TOWER_RADIUS = 20; // maps without placed towers use the default corner bases
 const SPAWN_GAP = 10; // distance between a tower's edge and its team's spawn point
@@ -27,7 +29,7 @@ const SPAWN_SPACING = 4; // distance between teammates spawning side by side
  * to bases in opposite corners.
  */
 export function buildTowers(map) {
-  const placed = (map?.objects || []).filter((o) => o?.type === TOWER_TYPE);
+  const placed = (map?.objects || []).filter(isTowerObject);
   if (placed.length === REQUIRED_TOWERS) {
     return placed.map((object, index) => {
       const scale = object.scale || 1;

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { MapObject, createUid } from './mapAssets.js';
+import { MapObject, createUid, getObjectDefinition } from './mapAssets.js';
 import { Environment, createGroundGeometry, createGroundMaterial } from './environment.js';
 
 const GROUND_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -366,7 +366,8 @@ export class MapEditorScene {
       position: { x: this.snapValue(point.x), y: 0, z: this.snapValue(point.z) },
       rotationY: this.placeSettings.rotationY,
       scale: this.placeSettings.scale,
-      animation: this.placeSettings.animation
+      animation: this.placeSettings.animation,
+      ...(getObjectDefinition(this.placingType)?.tower ? { tower: true } : {})
     };
     this.clampToMap(data.position);
     this.createEntry(data);

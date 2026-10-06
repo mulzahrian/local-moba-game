@@ -6,7 +6,8 @@ import {
   getCategories,
   getObjectDefinition,
   getObjectDefinitions,
-  localizedName
+  localizedName,
+  refreshObjectLibrary
 } from '../../map/mapAssets.js';
 import { mapApi } from '../../map/mapApi.js';
 import { REQUIRED_TOWERS, countTowers, MAP_MUSIC_OPTIONS, MUSIC_NONE, sanitizeMusic } from '../../../../shared/mapConfig.js';
@@ -90,7 +91,8 @@ export function MapEditor({ mapId, onExit }) {
   const [placingType, setPlacingType] = useState(null);
   const [placeSettings, setPlaceSettings] = useState(null);
   const [snap, setSnap] = useState(5);
-  const [category, setCategory] = useState(getCategories()[0]?.id);
+  const [category, setCategory] = useState(null);
+  const [libraryVersion, setLibraryVersion] = useState(0); // bumped once the uploaded objects are loaded
   const [dirty, setDirty] = useState(false);
   const [status, setStatus] = useState(null); // { type: 'ok' | 'error', text }
   const [animationNames, setAnimationNames] = useState([]);
@@ -102,13 +104,20 @@ export function MapEditor({ mapId, onExit }) {
   const setCharacterId = useSettingsStore((s) => s.setCharacterId);
 
   const categories = getCategories();
-  const definitions = useMemo(() => getObjectDefinitions(), []);
-  const visibleDefinitions = definitions.filter((d) => d.category === category);
+  const definitions = useMemo(() => getObjectDefinitions(), [libraryVersion]);
+  const activeCategory = categories.some((c) => c.id === category) ? category : categories[0]?.id;
+  const visibleDefinitions = definitions.filter((d) => d.category === activeCategory);
   const selected = objects.find((o) => o.uid === selectedUid) || null;
   const towerCount = countTowers(objects);
   const activeType = selected?.type || placingType;
 
   useEffect(() => {
+    // Started before the scene exists so objects placed by loadMap() wait for the same request.
+    let active = true;
+    refreshObjectLibrary().then(() => {
+      if (active) setLibraryVersion((v) => v + 1);
+    });
+
     const scene = new MapEditorScene(containerRef.current, {
       onChange: (list) => {
         setObjects(list);
@@ -143,6 +152,7 @@ export function MapEditor({ mapId, onExit }) {
     }
 
     return () => {
+      active = false;
       scene.dispose();
       sceneRef.current = null;
     };
@@ -339,16 +349,16 @@ export function MapEditor({ mapId, onExit }) {
             {categories.map((c) => (
               <button
                 key={c.id}
-                className={`ed-tab ${category === c.id ? 'active' : ''}`}
+                className={`ed-tab ${activeCategory === c.id ? 'active' : ''}`}
                 title={c.name[language] || c.name.en}
                 onClick={() => setCategory(c.id)}
               >
-                <CategoryIcon id={c.id} />
+                <CategoryIcon id={c.id} logoUrl={c.logoUrl} />
               </button>
             ))}
           </div>
           <div className="ed-tab-title">
-            {categories.find((c) => c.id === category)?.name[language]}
+            {categories.find((c) => c.id === activeCategory)?.name[language]}
           </div>
 
           <div className="ed-palette">

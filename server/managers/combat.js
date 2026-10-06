@@ -2,6 +2,7 @@ import { HIT_RADIUS, getActionDef, getManaCost } from '../../shared/characterCon
 
 const PULL_STOP_DISTANCE = 3; // pulled targets stop this far in front of the caster
 const CC_STUN_MS = 450;
+const MAX_SKILL_STUN_MS = 6000;
 
 export function getArenaLimit(room) {
   return (room.map?.size || 500) / 2 - 10;
@@ -20,6 +21,12 @@ function clampToArena(position, limit) {
     x: Math.min(Math.max(position.x, -limit), limit),
     z: Math.min(Math.max(position.z, -limit), limit)
   };
+}
+
+// What the clients need to draw a skill (no cost or cooldown data).
+function publicSkill(def) {
+  const { skillId, power, effect, name, shape, range, arc, width, healRadius } = def;
+  return { skillId, power, effect, name, shape, range, arc, width, healRadius };
 }
 
 function isHit(def, caster, dir, target, radius = HIT_RADIUS) {
@@ -46,23 +53,31 @@ function isHit(def, caster, dir, target, radius = HIT_RADIUS) {
 /**
  * Resolves an action (attack, skill or emote) for `caster`. Validates cooldown and mana, applies
  * damage / crowd control / healing to the enemies it hits and returns the event to broadcast
- * (or null when the action is not allowed right now).
+ * (or null when the action is not allowed right now). `custom` is the definition of an equipped skill
+ * (see toActionDef in shared/skillConfig.js); without it the slot is an attack / role skill / emote.
  */
-export function resolveAction(room, caster, slot, rawDir, now = Date.now()) {
+export function resolveAction(room, caster, slot, rawDir, now = Date.now(), custom = null) {
   if (!caster || caster.dead || room.gameState === 'finished') return null;
-  const def = getActionDef(caster.role, slot);
+  const def = custom || getActionDef(caster.role, slot);
   const dir = normalize(rawDir);
   if (!def || !dir) return null;
 
   if ((caster.cooldowns[slot] || 0) > now) return null;
-  const cost = getManaCost(caster.role, slot);
+  const cost = custom ? custom.manaCost : getManaCost(caster.role, slot);
   if (caster.mana < cost) return null;
 
   caster.cooldowns[slot] = now + def.cooldown * 1000 - 50; // small tolerance for network jitter
   caster.mana -= cost;
 
   const limit = getArenaLimit(room);
-  const event = { casterId: caster.id, slot, dir, hits: [], towerHits: [], casterPosition: null };
+  const event = { casterId: caster.id, slot, dir, hits: [], towerHits: [], heals: [], casterPosition: null };
+  if (custom) event.skill = publicSkill(custom);
+
+  // Attacking breaks invisibility.
+  if ((caster.invisibleUntil || 0) > now && (def.damage > 0 || def.cc)) {
+    caster.invisibleUntil = 0;
+    event.revealed = true;
+  }
 
   const origin = caster.position; // cones/lines are tested from where the caster started
   if (def.dash) {
@@ -94,16 +109,23 @@ export function resolveAction(room, caster, slot, rawDir, now = Date.now()) {
         event.winnerTeam = caster.team;
       }
     });
+  }
 
+  if (def.damage > 0 || def.cc) {
     room.players.forEach((target) => {
       if (target.id === caster.id || target.team === caster.team || target.dead) return;
       if (!isHit(def, { position: origin }, dir, target)) return;
 
-      target.health = Math.max(0, target.health - def.damage);
+      target.health = Math.max(0, target.health - (def.damage || 0));
       if (target.health <= 0) target.dead = true;
       let reaction = 'hit';
+      let stunMs = 0;
 
-      if (def.cc?.type === 'knockback') {
+      if (def.cc?.type === 'stun') {
+        reaction = 'stunned';
+        stunMs = Math.min(def.cc.ms || 0, MAX_SKILL_STUN_MS);
+        target.stunUntil = Math.max(target.stunUntil || 0, now + stunMs);
+      } else if (def.cc?.type === 'knockback') {
         reaction = 'knockback';
         const dx = target.position.x - caster.position.x;
         const dz = target.position.z - caster.position.z;
@@ -131,7 +153,7 @@ export function resolveAction(room, caster, slot, rawDir, now = Date.now()) {
         }
       }
 
-      if (reaction !== 'hit') target.stunUntil = now + CC_STUN_MS; // bots wait out the displacement
+      if (reaction !== 'hit' && reaction !== 'stunned') target.stunUntil = now + CC_STUN_MS; // bots wait out the displacement
 
       event.hits.push({
         targetId: target.id,
@@ -139,12 +161,27 @@ export function resolveAction(room, caster, slot, rawDir, now = Date.now()) {
         health: target.health,
         reaction,
         position: { x: target.position.x, z: target.position.z },
-        died: target.health <= 0
+        died: target.health <= 0,
+        ...(stunMs ? { stunMs } : {})
       });
     });
   }
 
-  if (def.heal) caster.health = Math.min(caster.maxHealth, caster.health + def.heal);
+  if (def.heal) {
+    const allies = def.healRadius > 0
+      ? room.players.filter((p) => p.team === caster.team && !p.dead && Math.hypot(p.position.x - caster.position.x, p.position.z - caster.position.z) <= def.healRadius)
+      : [];
+    if (!allies.includes(caster)) allies.push(caster);
+    allies.forEach((ally) => {
+      ally.health = Math.min(ally.maxHealth, ally.health + def.heal);
+      event.heals.push({ targetId: ally.id, amount: def.heal, health: ally.health });
+    });
+  }
+
+  if (def.vanish) {
+    caster.invisibleUntil = now + def.vanish * 1000;
+    event.vanishMs = def.vanish * 1000;
+  }
 
   return event;
 }

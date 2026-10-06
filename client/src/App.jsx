@@ -5,6 +5,7 @@ import { GameHUD } from './components/GameHUD.jsx';
 import { GameScene } from './scenes/GameScene.js';
 import { useGameStore } from './store/gameStore.js';
 import { socketService } from './services/SocketService.js';
+import { useSkillStore } from './store/skillStore.js';
 import { audioService } from './services/audioService.js';
 import { MenuBackdrop } from './components/MenuBackdrop.jsx';
 import { MagicLoader } from './components/MagicLoader.jsx';
@@ -66,6 +67,13 @@ function App() {
     document.addEventListener('click', onClick);
     return () => document.removeEventListener('click', onClick);
   }, []);
+
+  // Tell the server which skills are equipped (keys 1-4) once the match runs and whenever they change.
+  const equippedSkills = useSkillStore((state) => state.equipped);
+  useEffect(() => {
+    if (gameState !== 'in_game' || !roomCode) return;
+    socketService.emit('setLoadout', { roomCode, skillIds: equippedSkills.filter(Boolean) });
+  }, [gameState, roomCode, equippedSkills]);
 
   const gameContainerRef = useRef(null);
   const gameSceneRef = useRef(null);

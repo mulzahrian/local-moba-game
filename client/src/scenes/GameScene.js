@@ -3,11 +3,15 @@ import { MapObject } from '../map/mapAssets.js';
 import { Environment, createGroundGeometry, createGroundMaterial } from '../map/environment.js';
 import { BUILTIN_CHARACTER_ID, COMBO_WINDOW_SECONDS, getActionDef, getAttackType, getManaCost } from '../../../shared/characterConfig.js';
 import { CharacterActor } from '../character/CharacterActor.js';
-import { getCharacterDefinition, loadGltf } from '../character/characterAssets.js';
+import { getCharacterDefinition, loadGltf, setModelOpacity } from '../character/characterAssets.js';
 import { RUN_SOUND, playActionSound, playPowerSound, playReactionSound } from '../character/characterSounds.js';
 import { buildTowers } from '../../../shared/mapConfig.js';
 import { audioService } from '../services/audioService.js';
 import { EffectManager } from '../character/effects.js';
+import { isSkillSlot, skillIdOfSlot, skillSlot } from '../../../shared/skillConfig.js';
+import { getSkillAction } from '../skill/skillLibrary.js';
+import { SKILL_SOUND_EFFECT } from '../skill/skillEffects.js';
+import { useSkillStore } from '../store/skillStore.js';
 
 const UNIT_SCALE = 0.25; // characters are drawn at 0.25x relative to the map; scales character-attached helpers
 const MOVE_SPEED = 45 * UNIT_SCALE; // units per second
@@ -29,6 +33,8 @@ const KNOCKBACK_STUN_MS = 400;
 
 const KEY_ACTIONS = { KeyZ: 'skill1', KeyX: 'skill2', KeyC: 'skill3', KeyQ: 'emote', Space: 'jump' };
 const NO_REPEAT_ACTIONS = ['emote', 'jump'];
+const SKILL_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4']; // equipped skills (see skillStore)
+const GHOST_OPACITY = 0.35; // how visible an invisible player is to its own team
 
 const isTypingTarget = (target) =>
   target instanceof HTMLElement &&
@@ -82,6 +88,12 @@ export class GameScene {
   setupKeyboardControls() {
     this.onKeyDown = (event) => {
       if (isTypingTarget(event.target)) return;
+      const skillIndex = SKILL_KEYS.indexOf(event.code);
+      if (skillIndex >= 0) {
+        const skillId = useSkillStore.getState().equipped[skillIndex];
+        if (skillId && !event.repeat) this.performAction(skillSlot(skillId));
+        return;
+      }
       const action = KEY_ACTIONS[event.code];
       if (action) {
         if (event.code === 'Space') event.preventDefault(); // don't scroll the page / click a focused button
@@ -625,11 +637,13 @@ export class GameScene {
       slot = combo ? 'attack2' : 'attack1';
     }
 
-    const def = getActionDef(me.role, slot);
+    const custom = isSkillSlot(slot);
+    const def = custom ? getSkillAction(skillIdOfSlot(slot)) : getActionDef(me.role, slot);
     if (!def || (me.cooldownEnds[slot] || 0) > now) return;
 
     const networked = Boolean(this.socketService && this.roomCode);
-    if (networked && (me.data.mana ?? Infinity) < getManaCost(me.role, slot)) return;
+    const cost = custom ? def.manaCost : getManaCost(me.role, slot);
+    if (networked && (me.data.mana ?? Infinity) < cost) return;
 
     me.sendLockUntil = now + SEND_LOCK_MS;
     const dir = this.getAimDirection(me);
@@ -639,7 +653,13 @@ export class GameScene {
       return;
     }
 
-    const event = { casterId: me.playerId, slot, dir, hits: [], casterPosition: null };
+    const event = { casterId: me.playerId, slot, dir, hits: [], heals: [], casterPosition: null };
+    if (custom) {
+      const { skillId, power, effect, name, shape, range, arc, width, healRadius } = def;
+      event.skill = { skillId, power, effect, name, shape, range, arc, width, healRadius };
+      if (def.heal) event.heals.push({ targetId: me.playerId, amount: def.heal, health: me.data.health });
+      if (def.vanish) event.vanishMs = def.vanish * 1000;
+    }
     if (def.dash) {
       event.casterPosition = {
         x: THREE.MathUtils.clamp(me.mesh.position.x + dir.x * def.dash, -this.arenaLimit, this.arenaLimit),
@@ -655,9 +675,14 @@ export class GameScene {
     const now = performance.now();
 
     if (caster) {
-      const def = getActionDef(caster.role, event.slot);
+      const custom = event.skill || null;
+      const def = custom ? getSkillAction(custom.skillId) : getActionDef(caster.role, event.slot);
       caster.model.rotation.y = Math.atan2(event.dir.x, event.dir.z);
-      caster.actor.play(event.slot);
+      if (custom) {
+        if (!caster.actor.play('skill1')) caster.actor.play('attack1'); // skills have no clip of their own
+      } else {
+        caster.actor.play(event.slot);
+      }
 
       if (def) {
         caster.cooldownEnds[event.slot] = now + def.cooldown * 1000;
@@ -670,8 +695,19 @@ export class GameScene {
         caster.nextAttack = 'attack1';
       }
 
-      const effectId = this.getEffectId(caster, event.slot, def);
-      playActionSound(caster.def, event.slot, effectId, this.soundVolume(caster.mesh.position));
+      if (custom) {
+        playPowerSound(SKILL_SOUND_EFFECT[custom.power], this.soundVolume(caster.mesh.position));
+        this.effects.spawn(custom.effect, {
+          position: caster.mesh.position,
+          rotationY: caster.model.rotation.y,
+          range: custom.range || custom.healRadius || 6,
+          shape: custom.shape || 'circle',
+          params: { arc: custom.arc, width: custom.width, radius: custom.healRadius }
+        });
+      }
+
+      const effectId = custom ? null : this.getEffectId(caster, event.slot, def);
+      if (!custom) playActionSound(caster.def, event.slot, effectId, this.soundVolume(caster.mesh.position));
       if (def && effectId) {
         this.effects.spawn(effectId, {
           position: caster.mesh.position,
@@ -681,10 +717,17 @@ export class GameScene {
           model: caster.model
         });
       }
-      if (def?.heal) this.spawnFloater(caster.mesh.position, `+${def.heal}`, '#7dff9c');
+      if (event.vanishMs) caster.vanishUntil = now + event.vanishMs;
+      if (event.revealed) caster.vanishUntil = 0;
       if (event.casterPosition) this.displace(caster, event.casterPosition, DASH_SECONDS);
     }
 
+    (event.heals || []).forEach((heal) => {
+      const target = this.players.get(heal.targetId);
+      if (!target) return;
+      target.data = { ...target.data, health: heal.health };
+      this.spawnFloater(target.mesh.position, `+${heal.amount}`, '#7dff9c');
+    });
     event.hits.forEach((hit) => this.applyHit(hit));
     (event.towerHits || []).forEach((hit) => this.handleTowerHit(hit));
   }
@@ -706,11 +749,29 @@ export class GameScene {
     if (!target) return;
 
     target.data = { ...target.data, health: hit.health };
-    this.spawnFloater(target.mesh.position, `-${hit.damage}`, '#ff6b6b');
+    if (hit.damage > 0) this.spawnFloater(target.mesh.position, `-${hit.damage}`, '#ff6b6b');
 
     if (!target.actor.play(hit.reaction)) target.actor.play('hit');
-    playReactionSound(target.def, hit.reaction, this.soundVolume(target.mesh.position));
-    if (hit.reaction !== 'hit') this.displace(target, hit.position, KNOCKBACK_SECONDS, KNOCKBACK_STUN_MS);
+    playReactionSound(target.def, hit.reaction === 'stunned' ? 'hit' : hit.reaction, this.soundVolume(target.mesh.position));
+    if (hit.stunMs) {
+      target.stunUntil = Math.max(target.stunUntil, performance.now() + hit.stunMs);
+      this.spawnFloater(target.mesh.position, 'STUN', '#ffd34d');
+    } else if (hit.reaction !== 'hit') {
+      this.displace(target, hit.position, KNOCKBACK_SECONDS, KNOCKBACK_STUN_MS);
+    }
+  }
+
+  // Invisible players are see-through for their own team and hidden from the enemies.
+  updateStealth(now) {
+    const me = this.getCurrentPlayerEntry();
+    for (const player of this.players.values()) {
+      const invisible = (player.vanishUntil || 0) > now;
+      const state = !invisible ? 'visible' : me && player.data.team === me.data.team ? 'ghost' : 'hidden';
+      if (state === (player.stealthState || 'visible')) continue;
+      player.stealthState = state;
+      setModelOpacity(player.model, state === 'ghost' ? GHOST_OPACITY : 1);
+      player.mesh.visible = state !== 'hidden' && !player.dead;
+    }
   }
 
   // Smoothly slides a player to `to`; the local player can't walk while it happens.
@@ -743,6 +804,7 @@ export class GameScene {
     const player = this.players.get(playerId);
     if (!player) return;
     player.dead = true;
+    player.vanishUntil = 0;
     player.displacement = null;
     player.data = { ...player.data, health: 0 };
     player.mesh.visible = false;
@@ -883,6 +945,7 @@ export class GameScene {
       }
       player.actor.update(delta);
     }
+    this.updateStealth(now);
     this.effects.update(delta);
     this.updateFloaters(delta);
 

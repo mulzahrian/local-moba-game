@@ -141,7 +141,8 @@ const CATEGORY_ICONS = {
   tower: Tower
 };
 
-export function CategoryIcon({ id }) {
+export function CategoryIcon({ id, logoUrl }) {
+  if (logoUrl) return <img className="ed-icon ed-icon-logo" src={logoUrl} alt="" />;
   const Icon = CATEGORY_ICONS[id] || Fallback;
   return <Icon />;
 }

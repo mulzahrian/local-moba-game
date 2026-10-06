@@ -4,6 +4,8 @@ import { MultiplayerView } from './menu/MultiplayerView.jsx';
 import { CreateRoomView } from './menu/CreateRoomView.jsx';
 import { JoinRoomView } from './menu/JoinRoomView.jsx';
 import { MapListView } from './menu/MapListView.jsx';
+import { ObjectLibraryView } from './menu/ObjectLibraryView.jsx';
+import { SkillGeneratorView } from './menu/SkillGeneratorView.jsx';
 import { SettingsView } from './menu/SettingsView.jsx';
 import { MenuBackdrop } from './MenuBackdrop.jsx';
 import { MapEditor } from './editor/MapEditor.jsx';
@@ -13,7 +15,7 @@ import { useT } from '../i18n/index.js';
 
 export function MenuScreen({ onCreateRoom, onJoinRoom }) {
   const t = useT();
-  const [view, setView] = useState('main'); // main, play, single, multiplayer, create, join, maps, editor, characters, character-editor, settings
+  const [view, setView] = useState('main'); // main, play, single, multiplayer, create, join, maps, editor, characters, character-editor, skills, settings
   const [editingMapId, setEditingMapId] = useState(null); // null = new map
   const [editingCharacterId, setEditingCharacterId] = useState(null); // null = new character
 
@@ -45,12 +47,16 @@ export function MenuScreen({ onCreateRoom, onJoinRoom }) {
       content = (
         <MapListView
           onBack={() => setView('main')}
+          onNavigate={setView}
           onEdit={(id) => {
             setEditingMapId(id);
             setView('editor');
           }}
         />
       );
+      break;
+    case 'map-objects':
+      content = <ObjectLibraryView onBack={() => setView('main')} onNavigate={setView} />;
       break;
     case 'characters':
       content = (
@@ -62,6 +68,9 @@ export function MenuScreen({ onCreateRoom, onJoinRoom }) {
           }}
         />
       );
+      break;
+    case 'skills':
+      content = <SkillGeneratorView onBack={() => setView('main')} />;
       break;
     case 'settings':
       content = <SettingsView onBack={() => setView('main')} />;
@@ -78,6 +87,9 @@ export function MenuScreen({ onCreateRoom, onJoinRoom }) {
           <button className="fantasy-btn" onClick={() => setView('characters')}>
             {t('menu.characterGenerator')}
           </button>
+          <button className="fantasy-btn" onClick={() => setView('skills')}>
+            {t('menu.skillGenerator')}
+          </button>
           <button className="fantasy-btn" onClick={() => setView('settings')}>
             {t('menu.settings')}
           </button>
@@ -85,5 +97,5 @@ export function MenuScreen({ onCreateRoom, onJoinRoom }) {
       );
   }
 
-  return <MenuBackdrop wide={view === 'play'}>{content}</MenuBackdrop>;
+  return <MenuBackdrop wide={view === 'play' || view === 'map-objects' || view === 'skills'}>{content}</MenuBackdrop>;
 }

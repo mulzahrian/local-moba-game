@@ -12,6 +12,10 @@ import characterStore, {
   imageTypeOf,
   isGlb
 } from './managers/CharacterStore.js';
+import objectStore from './managers/ObjectStore.js';
+import { installDefaultObjects } from './managers/DefaultObjects.js';
+import skillStore from './managers/SkillStore.js';
+import { setLoadout } from './managers/loadouts.js';
 import { sanitizeTeamSize } from '../shared/matchConfig.js';
 import { BUILTIN_CHARACTER_ID, DEFAULT_ROLE } from '../shared/characterConfig.js';
 
@@ -189,6 +193,186 @@ app.delete('/api/characters/:id', async (req, res) => {
   }
 });
 
+// Object library API: main objects (name + logo) holding uploaded GLB sub objects for the map editor
+const withGroupVersion = (group) => ({ ...group, version: group.updatedAt });
+const notFound = (res, what) => res.status(404).json({ success: false, message: `${what} not found` });
+
+app.get('/api/object-groups', async (req, res) => {
+  try {
+    res.json({ success: true, groups: (await objectStore.list()).map(withGroupVersion) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.post('/api/object-groups', async (req, res) => {
+  try {
+    res.status(201).json({ success: true, group: withGroupVersion(await objectStore.create(req.body)) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.put('/api/object-groups/:id', async (req, res) => {
+  try {
+    const group = await objectStore.update(req.params.id, req.body);
+    if (!group) return notFound(res, 'Object');
+    res.json({ success: true, group: withGroupVersion(group) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.delete('/api/object-groups/:id', async (req, res) => {
+  try {
+    if (!(await objectStore.remove(req.params.id))) return notFound(res, 'Object');
+    res.json({ success: true });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.put('/api/object-groups/:id/logo', express.raw({ type: () => true, limit: MAX_IMAGE_BYTES }), async (req, res) => {
+  try {
+    const ext = Buffer.isBuffer(req.body) ? imageTypeOf(req.body) : null;
+    if (!ext) return res.status(400).json({ success: false, message: 'File must be a PNG, JPG, WEBP or GIF image' });
+    const group = await objectStore.saveLogo(req.params.id, req.body, ext);
+    if (!group) return notFound(res, 'Object');
+    res.json({ success: true, group: withGroupVersion(group) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.get('/api/object-groups/:id/logo', async (req, res) => {
+  try {
+    const group = await objectStore.get(req.params.id);
+    const file = objectStore.logoPath(group);
+    if (!file) return notFound(res, 'Logo');
+    res.type(imageContentType(group.logoExt)).sendFile(file);
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.post('/api/object-groups/:id/objects', async (req, res) => {
+  try {
+    const result = await objectStore.addObject(req.params.id, req.body);
+    if (!result) return notFound(res, 'Object');
+    res.status(201).json({ success: true, group: withGroupVersion(result.group), objectId: result.object.id });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.put('/api/object-groups/:id/objects/:objectId', async (req, res) => {
+  try {
+    const result = await objectStore.updateObject(req.params.id, req.params.objectId, req.body);
+    if (!result) return notFound(res, 'Object');
+    res.json({ success: true, group: withGroupVersion(result.group) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.delete('/api/object-groups/:id/objects/:objectId', async (req, res) => {
+  try {
+    const group = await objectStore.removeObject(req.params.id, req.params.objectId);
+    if (!group) return notFound(res, 'Object');
+    res.json({ success: true, group: withGroupVersion(group) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.put(
+  '/api/object-groups/:id/objects/:objectId/model',
+  express.raw({ type: () => true, limit: MAX_MODEL_BYTES }),
+  async (req, res) => {
+    try {
+      if (!Buffer.isBuffer(req.body) || !isGlb(req.body)) {
+        return res.status(400).json({ success: false, message: 'File must be a .glb model' });
+      }
+      const group = await objectStore.saveObjectModel(req.params.id, req.params.objectId, req.body);
+      if (!group) return notFound(res, 'Object');
+      res.json({ success: true, group: withGroupVersion(group) });
+    } catch (error) {
+      handleMapError(res, error);
+    }
+  }
+);
+
+app.get('/api/object-groups/:id/objects/:objectId/model', async (req, res) => {
+  try {
+    const group = await objectStore.get(req.params.id);
+    const object = group?.objects.find((o) => o.id === req.params.objectId);
+    if (!object?.hasModel) return notFound(res, 'Model');
+    res.type('model/gltf-binary').sendFile(objectStore.modelPath(group.id, object.id));
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+// Skill library API: skills made in the Skill Generator (power, effect, cost, price and an optional icon)
+const withSkillVersion = (skill) => ({ ...skill, version: skill.updatedAt });
+
+app.get('/api/skills', async (req, res) => {
+  try {
+    res.json({ success: true, skills: (await skillStore.list()).map(withSkillVersion) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.post('/api/skills', async (req, res) => {
+  try {
+    res.status(201).json({ success: true, skill: withSkillVersion(await skillStore.create(req.body)) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.put('/api/skills/:id', async (req, res) => {
+  try {
+    const skill = await skillStore.update(req.params.id, req.body);
+    if (!skill) return notFound(res, 'Skill');
+    res.json({ success: true, skill: withSkillVersion(skill) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.delete('/api/skills/:id', async (req, res) => {
+  try {
+    if (!(await skillStore.remove(req.params.id))) return notFound(res, 'Skill');
+    res.json({ success: true });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.put('/api/skills/:id/icon', express.raw({ type: () => true, limit: MAX_IMAGE_BYTES }), async (req, res) => {
+  try {
+    const ext = Buffer.isBuffer(req.body) ? imageTypeOf(req.body) : null;
+    if (!ext) return res.status(400).json({ success: false, message: 'File must be a PNG, JPG, WEBP or GIF image' });
+    const skill = await skillStore.saveIcon(req.params.id, req.body, ext);
+    if (!skill) return notFound(res, 'Skill');
+    res.json({ success: true, skill: withSkillVersion(skill) });
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
+
+app.get('/api/skills/:id/icon', async (req, res) => {
+  try {
+    const skill = await skillStore.get(req.params.id);
+    const file = skillStore.iconPath(skill);
+    if (!file) return notFound(res, 'Icon');
+    res.type(imageContentType(skill.iconExt)).sendFile(file);
+  } catch (error) {
+    handleMapError(res, error);
+  }
+});
 // Resolves the character a player picked into the data the room needs (null when it does not exist).
 async function resolveCharacter(characterId) {
   if (characterId === BUILTIN_CHARACTER_ID) return { id: BUILTIN_CHARACTER_ID, role: DEFAULT_ROLE };
@@ -416,6 +600,19 @@ io.on('connection', (socket) => {
     gameManager.performAction(room, caster, data.slot, data.dir);
   });
 
+  // The skills the player equipped (ids from the skill library); they can be used with the skill keys.
+  socket.on('setLoadout', async (data) => {
+    try {
+      const room = gameManager.getRoom(data?.roomCode);
+      const player = room?.players.find((p) => p.id === socket.id);
+      if (!player) return;
+      const loadout = await setLoadout(player, data.skillIds);
+      socket.emit('loadoutUpdated', { skillIds: loadout });
+    } catch (error) {
+      console.error('[Loadout] Error:', error);
+    }
+  });
+
   socket.on('leaveRoom', () => {
     for (const roomCode of socket.rooms) {
       if (roomCode !== socket.id) socket.leave(roomCode);
@@ -444,6 +641,13 @@ io.on('connection', (socket) => {
     gameManager.playerDisconnect(socket.id);
     console.log(`[${new Date().toLocaleTimeString()}] Player disconnected: ${socket.id}`);
   });
+});
+
+await installDefaultObjects(mapStore).catch((error) => {
+  console.error('[Objects] Could not install the default objects:', error);
+});
+await skillStore.seedDefaults().catch((error) => {
+  console.error('[Skills] Could not install the default skills:', error);
 });
 
 const PORT = process.env.PORT || 3001;

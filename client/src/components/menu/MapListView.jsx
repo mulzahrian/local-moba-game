@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useT } from '../../i18n/index.js';
 import { mapApi } from '../../map/mapApi.js';
+import { MapTabs } from './MapTabs.jsx';
 
-export function MapListView({ onBack, onEdit }) {
+export function MapListView({ onBack, onEdit, onNavigate }) {
   const t = useT();
   const [maps, setMaps] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -38,6 +39,7 @@ export function MapListView({ onBack, onEdit }) {
   return (
     <div className="menu-panel wide">
       <h2 className="panel-title">{t('maps.title')}</h2>
+      <MapTabs active="maps" onNavigate={onNavigate} />
 
       <div className="map-pick-list">
         {loading && <p className="hint">{t('common.loading')}</p>}

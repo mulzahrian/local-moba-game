@@ -18,3 +18,9 @@ build/
 
 # user-uploaded characters (GLB models and profile images)
 server/data/characters/
+
+# user-uploaded map objects (GLB models and logos)
+server/data/objects/
+
+# skills made in the Skill Generator (icons)
+server/data/skills/

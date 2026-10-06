@@ -57,7 +57,8 @@ export function sanitizeMap(input, id, previous = null) {
       position: { x: num(o?.position?.x), y: num(o?.position?.y), z: num(o?.position?.z) },
       rotationY: num(o?.rotationY),
       scale: Math.min(Math.max(num(o?.scale, 1), 0.01), 1000),
-      animation: o?.animation ? str(o.animation, 120) : null
+      animation: o?.animation ? str(o.animation, 120) : null,
+      ...(o?.tower === true ? { tower: true } : {})
     })).filter((o) => o.type)
   };
 }
@@ -134,6 +135,34 @@ class MapStore {
     assertValidMap(map);
     await fs.writeFile(this.filePath(id), JSON.stringify(map, null, 2));
     return map;
+  }
+
+  // Rewrites object types in every saved map using `typeMap` (old type -> { type, tower }).
+  // Returns the ids of the maps that changed.
+  async migrateObjectTypes(typeMap) {
+    if (!typeMap.size) return [];
+    await this.ensureDir();
+    const changed = [];
+    for (const file of (await fs.readdir(MAPS_DIR)).filter((f) => f.endsWith('.json'))) {
+      try {
+        const filePath = path.join(MAPS_DIR, file);
+        const map = JSON.parse(await fs.readFile(filePath, 'utf8'));
+        let dirty = false;
+        (Array.isArray(map.objects) ? map.objects : []).forEach((object) => {
+          const target = typeMap.get(object.type);
+          if (!target) return;
+          object.type = target.type;
+          if (target.tower) object.tower = true;
+          dirty = true;
+        });
+        if (!dirty) continue;
+        await fs.writeFile(filePath, JSON.stringify(map, null, 2));
+        changed.push(map.id || file);
+      } catch (error) {
+        console.error(`[MapStore] Could not migrate map file ${file}:`, error.message);
+      }
+    }
+    return changed;
   }
 
   async remove(id) {

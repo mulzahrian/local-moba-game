@@ -3,6 +3,8 @@ import { DEFAULT_MAP_SIZE, buildTowers, getSpawnPosition, getTowerForTeam } from
 import { DEFAULT_TEAM_SIZE, TEAMS } from '../../shared/matchConfig.js';
 import { BOT_TICK_MS, pickBotName, tickBots } from './bots.js';
 import { resolveAction } from './combat.js';
+import { getSkillDef } from './loadouts.js';
+import { isSkillSlot, skillIdOfSlot } from '../../shared/skillConfig.js';
 
 // Builds a fresh in-room player for the chosen character (role decides health and mana pools).
 function createPlayer(id, name, team, slot, position, character, isBot = false) {
@@ -24,7 +26,9 @@ function createPlayer(id, name, team, slot, position, character, isBot = false) 
     level: 1,
     experience: 0,
     dead: false,
-    cooldowns: {}
+    cooldowns: {},
+    loadout: [], // ids of the equipped skills (see loadouts.js)
+    invisibleUntil: 0
   };
 }
 
@@ -51,7 +55,12 @@ class GameManager {
 
   // Resolves an attack / skill / emote through the combat rules and tells the room what happened.
   performAction(room, caster, slot, dir) {
-    const event = resolveAction(room, caster, slot, dir);
+    let custom = null;
+    if (isSkillSlot(slot)) {
+      custom = getSkillDef(caster, skillIdOfSlot(slot));
+      if (!custom) return null; // not equipped
+    }
+    const event = resolveAction(room, caster, slot, dir, Date.now(), custom);
     if (!event) return null;
 
     this.io.to(room.code).emit('skillUsed', { ...event, players: room.players });
@@ -124,6 +133,7 @@ class GameManager {
       current.mana = current.maxMana;
       current.position = { ...current.spawn };
       current.cooldowns = {};
+      current.invisibleUntil = 0;
       this.io.to(roomCode).emit('playerRespawned', { player: current });
     }, RESPAWN_SECONDS * 1000);
   }

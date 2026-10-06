@@ -7,12 +7,12 @@ import { setModelOpacity } from './characterAssets.js';
  * be used by any skill. `tick(t, dt)` animates it, `duration` ends it.
  */
 
-const TAU = Math.PI * 2;
-const clamp01 = (v) => Math.min(1, Math.max(0, v));
-const easeOut = (v) => 1 - (1 - clamp01(v)) ** 3;
-const rand = (min, max) => min + Math.random() * (max - min);
+export const TAU = Math.PI * 2;
+export const clamp01 = (v) => Math.min(1, Math.max(0, v));
+export const easeOut = (v) => 1 - (1 - clamp01(v)) ** 3;
+export const rand = (min, max) => min + Math.random() * (max - min);
 
-class Fx {
+export class Fx {
   constructor(duration) {
     this.duration = duration;
     this.group = new THREE.Group();
@@ -497,6 +497,11 @@ export const EFFECT_LABELS = {
   meteorFall: { en: 'Meteor Fall', id: 'Hujan Meteor' }
 };
 
+// Lets other effect sets (the skill effects) plug their builders into the same manager.
+export function registerEffects(builders) {
+  Object.assign(BUILDERS, builders);
+}
+
 export function effectLabel(id, language) {
   return EFFECT_LABELS[id]?.[language] || EFFECT_LABELS[id]?.en || id;
 }
@@ -511,12 +516,12 @@ export class EffectManager {
   /**
    * @param id effect id (see EFFECT_IDS)
    * @param options position (caster), rotationY (facing), range / shape of the skill, and the optional
-   *   character `model` that effects like shadowVanish may fade.
+   *   character `model` that effects like shadowVanish may fade, and the skill's own `params` (skill effects).
    */
-  spawn(id, { position, rotationY = 0, range = 8, shape = 'circle', model = null } = {}) {
+  spawn(id, { position, rotationY = 0, range = 8, shape = 'circle', model = null, params = null } = {}) {
     const build = BUILDERS[id];
     if (!build) return;
-    const fx = build({ range, shape });
+    const fx = build({ range, shape, params });
     fx.group.position.set(position.x, position.y || 0, position.z);
     fx.group.rotation.y = rotationY;
     this.scene.add(fx.group);

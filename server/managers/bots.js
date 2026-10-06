@@ -29,8 +29,8 @@ function nearestOf(list, from) {
 }
 
 // Closest enemy hero when one is near, otherwise the closest standing enemy tower.
-function findTarget(room, bot) {
-  const heroes = room.players.filter((other) => other.team !== bot.team && !other.dead);
+function findTarget(room, bot, now) {
+  const heroes = room.players.filter((other) => other.team !== bot.team && !other.dead && (other.invisibleUntil || 0) <= now);
   const towers = (room.towers || []).filter((tower) => tower.team !== bot.team && tower.health > 0);
   const hero = nearestOf(heroes, bot.position);
   if (hero && hero.distance <= AGGRO_RANGE) return hero;
@@ -69,7 +69,7 @@ export function tickBots(room, dt, cast, now = Date.now()) {
   room.players.forEach((bot) => {
     if (!bot.isBot || bot.dead || (bot.stunUntil || 0) > now) return;
     const mem = getMemory(bot);
-    const target = findTarget(room, bot);
+    const target = findTarget(room, bot, now);
     if (!target) return;
 
     const dx = target.position.x - bot.position.x;
