@@ -46,10 +46,10 @@ class GameManager {
     this.unitCounter = 0;
   }
 
-  // Monsters and summoned units act in every room, with or without computer players.
+  // Towers, monsters and summoned units act in every room that has human players.
   updateWorld() {
     for (const room of this.rooms.values()) {
-      if (!this.hasHumans(room) || (!room.monsters.length && !room.units.length)) continue;
+      if (!this.hasHumans(room)) continue;
       tickWorld(room, this, WORLD_TICK_MS / 1000);
     }
   }

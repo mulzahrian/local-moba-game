@@ -7,7 +7,7 @@ import { BUILTIN_CHARACTER_ID, COMBO_WINDOW_SECONDS, getActionDef, getAttackType
 import { CharacterActor } from '../character/CharacterActor.js';
 import { getCharacterDefinition, loadGltf, setModelOpacity } from '../character/characterAssets.js';
 import { RUN_SOUND, playActionSound, playPowerSound, playReactionSound } from '../character/characterSounds.js';
-import { buildTowers } from '../../../shared/mapConfig.js';
+import { buildTowers, getTowerForTeam } from '../../../shared/mapConfig.js';
 import { audioService } from '../services/audioService.js';
 import { EffectManager } from '../character/effects.js';
 import { attackEffectId } from '../character/attackEffects.js';
@@ -19,6 +19,7 @@ import { SKILL_SOUND_EFFECT } from '../skill/skillEffects.js';
 import { SUMMON_SOUND_EFFECT } from '../skill/summonEffects.js';
 import { getMonsterDefinition } from '../monster/monsterAssets.js';
 import { WorldActor } from '../world/WorldActor.js';
+import '../character/towerEffects.js';
 import { useSkillStore } from '../store/skillStore.js';
 import { useSettingsStore } from '../store/settingsStore.js';
 import { translate } from '../i18n/index.js';
@@ -268,7 +269,7 @@ export class GameScene {
         : this.markerGroups[tower.team];
 
       const ring = new THREE.Mesh(
-        new THREE.RingGeometry(tower.radius, tower.radius + 1.5, 48),
+        new THREE.RingGeometry(tower.radius, tower.radius + (tower.main ? 2.5 : 1.2), 48),
         new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: true, opacity: 0.8 })
       );
       ring.rotation.x = -Math.PI / 2;
@@ -441,10 +442,22 @@ export class GameScene {
 
   // A monster / unit attacked or healed: play its animation and effect and show the result.
   handleEntityAttack(event) {
-    const attacker = this.worldActor(event.kind, event.id);
+    const tower = event.kind === 'tower' ? this.towers.get(event.id) : null;
+    const attacker = tower ? null : this.worldActor(event.kind, event.id);
     const to = this.entityPosition(event.targetKind, event.targetId);
 
-    if (attacker && to) {
+    if (tower && to) {
+      const dx = to.x - tower.position.x;
+      const dz = to.z - tower.position.z;
+      this.effects.spawn(event.effect, {
+        position: { x: tower.position.x, y: 0, z: tower.position.z },
+        rotationY: Math.atan2(dx, dz),
+        range: Math.hypot(dx, dz),
+        shape: 'line',
+        params: { color: tower.color, main: tower.main, height: tower.height * 0.85 }
+      });
+      playPowerSound(tower.main ? 'plasmaBeam' : 'magicCircle', this.soundVolume(tower.position));
+    } else if (attacker && to) {
       attacker.attack(event.slot || 'attack1', to.x, to.z);
       const from = attacker.group.position;
       const volume = this.soundVolume(from);
@@ -1145,9 +1158,9 @@ export class GameScene {
     return { role: me.role, dead: me.dead, mana: this.socketService ? me.data.mana : null, cooldowns, shop: this.getShopState(me) };
   }
 
-  // The shop opens near your own tower, and only during the first minutes of the match.
+  // The shop opens near your own main tower, and only during the first minutes of the match.
   getShopState(me) {
-    const tower = [...this.towers.values()].find((entry) => entry.team === me.data.team);
+    const tower = getTowerForTeam([...this.towers.values()], me.data.team);
     const nearBase =
       !!tower &&
       Math.hypot(me.mesh.position.x - tower.position.x, me.mesh.position.z - tower.position.z) <= tower.radius + SHOP_RANGE;

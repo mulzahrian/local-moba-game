@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { REQUIRED_TOWERS, countTowers, sanitizeMusic } from '../../shared/mapConfig.js';
+import { REQUIRED_TOWERS, TOWERS_PER_TEAM, TOWER_TEAMS, clampTowerHealth, countTowers, sanitizeMusic, validateTowers } from '../../shared/mapConfig.js';
 import { clampAggroRange } from '../../shared/monsterConfig.js';
 import { sanitizePaths } from '../../shared/pathConfig.js';
 
@@ -66,7 +66,13 @@ export function sanitizeMap(input, id, previous = null) {
         ? { scaleX: axisScale(o?.scaleX), scaleY: axisScale(o?.scaleY), scaleZ: axisScale(o?.scaleZ) }
         : {}),
       animation: o?.animation ? str(o.animation, 120) : null,
-      ...(o?.tower === true ? { tower: true } : {}),
+      ...(o?.tower === true
+        ? {
+            tower: true,
+            ...(TOWER_TEAMS.includes(o?.team) ? { team: o.team, main: o?.main === true } : {}),
+            ...(clampTowerHealth(o?.towerHealth, 0) ? { towerHealth: clampTowerHealth(o.towerHealth, 0) } : {})
+          }
+        : {}),
       ...(o?.noCollision === true ? { noCollision: true } : {}),
       ...(o?.monster === true ? { monster: true, aggroRange: clampAggroRange(o?.aggroRange) } : {})
     })).filter((o) => o.type),
@@ -74,11 +80,17 @@ export function sanitizeMap(input, id, previous = null) {
   };
 }
 
-// Rejects maps that do not contain exactly REQUIRED_TOWERS towers.
+const TOWER_ERRORS = {
+  count: `A map needs exactly ${REQUIRED_TOWERS} towers`,
+  teams: `Every team needs exactly ${TOWERS_PER_TEAM} towers`,
+  main: 'Every team needs exactly one main tower'
+};
+
+// Rejects maps whose towers are not 2 per team with one main tower each.
 export function assertValidMap(map) {
-  const towers = countTowers(map.objects);
-  if (towers !== REQUIRED_TOWERS) {
-    throw new MapValidationError(`A map needs exactly ${REQUIRED_TOWERS} towers (found ${towers})`);
+  const problem = validateTowers(map.objects);
+  if (problem) {
+    throw new MapValidationError(`${TOWER_ERRORS[problem]} (found ${countTowers(map.objects)} towers)`);
   }
 }
 

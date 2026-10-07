@@ -4,6 +4,7 @@ import { TransformControls } from 'three/examples/jsm/controls/TransformControls
 import { MapObject, createUid, getObjectDefinition } from './mapAssets.js';
 import { PathWalker } from './PathWalker.js';
 import { AGGRO_RANGE } from '../../../shared/monsterConfig.js';
+import { TOWER_KINDS, TOWER_RADIUS_PER_SCALE, completeTowerSettings, nextTowerSettings } from '../../../shared/mapConfig.js';
 import { PATH_ANIM_SPEED, PATH_SCALE, PATH_SPEED, createPathId } from '../../../shared/pathConfig.js';
 import { Environment, createGroundGeometry, createGroundMaterial } from './environment.js';
 
@@ -15,6 +16,7 @@ const PATH_COLOR = 0x4de1ff;
 const PATH_COLOR_SELECTED = 0xffd34d;
 const PATH_START_COLOR = 0x5dff7a;
 const MIN_POINT_GAP = 1; // closer clicks than this don't add another waypoint
+const TOWER_RING_COLORS = { team1: 0xff6b6b, team2: 0x4ecdc4 };
 
 export const DEFAULT_MAP_SIZE = 500;
 export const GIZMO_MODES = ['translate', 'rotate', 'scale'];
@@ -300,7 +302,7 @@ export class MapEditorScene {
     this.clearPaths();
     this.setupGround(map.size || DEFAULT_MAP_SIZE);
     this.setEnvironment(map.sky, map.weather);
-    (map.objects || []).forEach((data) => this.createEntry(clone(data)));
+    completeTowerSettings(map.objects || []).forEach((data) => this.createEntry(clone(data)));
     (map.paths || []).forEach((path) => this.createPathEntry(clonePath(path)));
     this.select(null);
     this.setPlacingType(null);
@@ -372,6 +374,17 @@ export class MapEditorScene {
     if (!entry) return;
     const { position, ...rest } = patch;
     Object.assign(entry.data, rest);
+    // a team has one main tower: promoting this one demotes the previous main tower of its team
+    if (rest.main === true) {
+      this.entries.forEach(({ data }) => {
+        if (data !== entry.data && data.tower && data.team === entry.data.team) data.main = false;
+      });
+    }
+    if (rest.team && entry.data.main) {
+      this.entries.forEach(({ data }) => {
+        if (data !== entry.data && data.tower && data.team === rest.team) data.main = false;
+      });
+    }
     if (position) {
       Object.assign(entry.data.position, position);
       this.clampToMap(entry.data.position);
@@ -397,6 +410,7 @@ export class MapEditorScene {
     data.uid = createUid();
     data.position.x += 10;
     data.position.z += 10;
+    if (data.tower) Object.assign(data, nextTowerSettings(this.getObjects()));
     this.clampToMap(data.position);
     this.createEntry(data);
     this.select(data.uid);
@@ -487,7 +501,7 @@ export class MapEditorScene {
       ...(this.placeSettings.rotationZ ? { rotationZ: this.placeSettings.rotationZ } : {}),
       scale: this.placeSettings.scale,
       animation: this.placeSettings.animation,
-      ...(definition?.tower ? { tower: true } : {}),
+      ...(definition?.tower ? { tower: true, ...nextTowerSettings(this.getObjects()) } : {}),
       ...(definition?.monster ? { monster: true, aggroRange: this.placeSettings.aggroRange ?? AGGRO_RANGE.value } : {})
     };
     this.clampToMap(data.position);
@@ -702,12 +716,12 @@ export class MapEditorScene {
     });
   }
 
-  // ---------- Monster aggro range ----------
+  // ---------- Monster aggro range / tower shooting range ----------
 
-  createRangeRing() {
+  createRangeRing(color = 0xff4a3a) {
     const group = new THREE.Group();
     const material = () =>
-      new THREE.MeshBasicMaterial({ color: 0xff4a3a, transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide });
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide });
     const fill = new THREE.Mesh(new THREE.CircleGeometry(1, 48), material());
     const edge = new THREE.Mesh(new THREE.RingGeometry(0.985, 1, 64), material());
     [fill, edge].forEach((mesh) => {
@@ -727,20 +741,28 @@ export class MapEditorScene {
     });
   }
 
-  // Draws the range within which every placed monster (and the one being placed) attacks players.
+  // Draws the range within which every placed monster (and the one being placed) attacks players, and the
+  // range within which every tower shoots, in its team's colour.
   syncRangeRings() {
     const seen = new Set();
     this.entries.forEach((entry, uid) => {
-      if (!entry.data.monster) return;
+      const { data } = entry;
+      if (!data.monster && !data.tower) return;
       seen.add(uid);
       let ring = this.rangeRings.get(uid);
       if (!ring) {
-        ring = this.createRangeRing();
+        ring = this.createRangeRing(data.tower ? TOWER_RING_COLORS[data.team] : undefined);
         this.rangeRings.set(uid, ring);
       }
       const selected = uid === this.selectedUid;
-      ring.position.set(entry.data.position.x, 0.15, entry.data.position.z);
-      ring.scale.setScalar(entry.data.aggroRange || AGGRO_RANGE.value);
+      ring.position.set(data.position.x, 0.15, data.position.z);
+      if (data.tower) {
+        const kind = data.main ? TOWER_KINDS.main : TOWER_KINDS.side;
+        ring.scale.setScalar(kind.range + TOWER_RADIUS_PER_SCALE * (data.scale || 1));
+        ring.children.forEach((mesh) => mesh.material.color.setHex(TOWER_RING_COLORS[data.team] ?? TOWER_RING_COLORS.team1));
+      } else {
+        ring.scale.setScalar(data.aggroRange || AGGRO_RANGE.value);
+      }
       ring.userData.fill.material.opacity = selected ? 0.18 : 0.07;
       ring.userData.edge.material.opacity = selected ? 0.95 : 0.45;
     });

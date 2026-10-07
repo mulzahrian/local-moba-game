@@ -2,6 +2,7 @@ import { HIT_RADIUS } from '../../shared/characterConfig.js';
 import { LEASH_FACTOR } from '../../shared/monsterConfig.js';
 import { getArenaLimit } from './combat.js';
 import { hurt, publicMonster, publicUnit } from './entities.js';
+import { tickTowers } from './towers.js';
 
 // Server-side behaviour of the entities in a room: monsters guard their spot and attack heroes that come
 // close; summoned units follow their owner and fight (or heal / restore mana for) their team.
@@ -259,6 +260,8 @@ function tickUnit(room, gm, unit, dt, now, limit) {
 export function tickWorld(room, gm, dt, now = Date.now()) {
   if (room.gameState !== 'in_progress') return;
   const limit = getArenaLimit(room);
+
+  tickTowers(room, gm, now);
 
   room.monsters.forEach((monster) => tickMonster(room, gm, monster, dt, now, limit));
   [...room.units].forEach((unit) => {

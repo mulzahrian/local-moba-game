@@ -10,7 +10,18 @@ import {
   refreshObjectLibrary
 } from '../../map/mapAssets.js';
 import { mapApi } from '../../map/mapApi.js';
-import { REQUIRED_TOWERS, countTowers, MAP_MUSIC_OPTIONS, MUSIC_NONE, sanitizeMusic } from '../../../../shared/mapConfig.js';
+import {
+  REQUIRED_TOWERS,
+  TOWERS_PER_TEAM,
+  TOWER_HEALTH,
+  TOWER_KINDS,
+  TOWER_TEAMS,
+  countTowers,
+  validateTowers,
+  MAP_MUSIC_OPTIONS,
+  MUSIC_NONE,
+  sanitizeMusic
+} from '../../../../shared/mapConfig.js';
 import { AGGRO_RANGE, clampAggroRange } from '../../../../shared/monsterConfig.js';
 import { PATH_ANIM_SPEED, PATH_SPEED, PATH_SCALE, guessWalkAnimation } from '../../../../shared/pathConfig.js';
 import { GameScene } from '../../scenes/GameScene.js';
@@ -297,9 +308,12 @@ export function MapEditor({ mapId, onExit }) {
 
   const save = async () => {
     const objectsToSave = scene().getObjects();
-    const towers = countTowers(objectsToSave);
-    if (towers !== REQUIRED_TOWERS) {
-      setStatus({ type: 'error', text: t('editor.towerError', { required: REQUIRED_TOWERS, count: towers }) });
+    const towerProblem = validateTowers(objectsToSave);
+    if (towerProblem) {
+      setStatus({
+        type: 'error',
+        text: t(`editor.towerError.${towerProblem}`, { required: REQUIRED_TOWERS, perTeam: TOWERS_PER_TEAM, count: countTowers(objectsToSave) })
+      });
       return;
     }
     const payload = {
@@ -571,6 +585,32 @@ export function MapEditor({ mapId, onExit }) {
               <SliderField label={t('editor.scaleUniform')} value={selected.scale}
                 min={0.1} max={10} step={0.05}
                 onChange={(v) => updateSelected({ scale: Math.max(v, 0.01) })} />
+              {selected.tower && (() => {
+                const kind = selected.main ? TOWER_KINDS.main : TOWER_KINDS.side;
+                return (
+                  <>
+                    <label className="ed-field">
+                      <span>{t('editor.towerTeam')}</span>
+                      <select value={selected.team || 'team1'} onChange={(e) => updateSelected({ team: e.target.value })}>
+                        {TOWER_TEAMS.map((team) => (
+                          <option key={team} value={team}>{t(`team.${team}`)}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="ed-field">
+                      <span>{t('editor.towerKind')}</span>
+                      <select value={selected.main ? 'main' : 'side'} onChange={(e) => updateSelected({ main: e.target.value === 'main' })}>
+                        <option value="main">{t('editor.towerMain')}</option>
+                        <option value="side">{t('editor.towerSide')}</option>
+                      </select>
+                    </label>
+                    <SliderField label={t('editor.towerHealth')} value={selected.towerHealth ?? kind.health}
+                      min={TOWER_HEALTH.min} max={2000} step={TOWER_HEALTH.step}
+                      onChange={(v) => updateSelected({ towerHealth: Math.max(1, Math.round(v)) })} />
+                    <p className="ed-hint">{t('editor.towerHint', { damage: kind.damage, range: kind.range })}</p>
+                  </>
+                );
+              })()}
               {!selected.monster && (
                 <label className="ed-check">
                   <input type="checkbox" checked={!selected.noCollision}
@@ -700,7 +740,7 @@ export function MapEditor({ mapId, onExit }) {
           {!selected && !selectedPath && !placeSettings && <p className="ed-hint">{t('editor.nothingSelected')}</p>}
 
           <div className="ed-count">{t('editor.count', { count: objects.length })}</div>
-          <div className={`ed-count ${towerCount === REQUIRED_TOWERS ? '' : 'ed-count-warn'}`}>
+          <div className={`ed-count ${validateTowers(objects) === null ? '' : 'ed-count-warn'}`}>
             {t('editor.towerCount', { count: towerCount, required: REQUIRED_TOWERS })}
           </div>
         </aside>

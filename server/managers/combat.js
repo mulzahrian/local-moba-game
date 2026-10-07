@@ -98,13 +98,16 @@ export function resolveAction(room, caster, slot, rawDir, now = Date.now(), cust
       if (!isHit(def, { position: origin }, dir, tower, tower.radius)) return;
 
       tower.health = Math.max(0, tower.health - def.damage);
+      tower.lastAttackerId = caster.id;
+      tower.lastAttackedAt = now;
       event.towerHits.push({
         towerId: tower.id,
         damage: def.damage,
         health: tower.health,
         destroyed: tower.health <= 0
       });
-      if (tower.health <= 0 && room.gameState !== 'finished') {
+      // Only the main tower decides the match; a fallen side tower just stops shooting
+      if (tower.main && tower.health <= 0 && room.gameState !== 'finished') {
         room.gameState = 'finished';
         room.winnerTeam = caster.team;
         event.winnerTeam = caster.team;
