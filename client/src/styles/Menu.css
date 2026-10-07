@@ -496,6 +496,54 @@
   width: min(760px, 94vw);
 }
 
+/* ===== Room list (Join menu) ===== */
+.room-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  margin-bottom: 18px;
+  overflow-y: auto;
+}
+
+.room-list .hint { margin: 8px 0; text-align: center; }
+
+.room-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  font-family: inherit;
+  color: #f6e2ae;
+  text-align: left;
+  background: rgba(10, 6, 3, 0.6);
+  border: 1px solid #6e5428;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.room-row:hover:not(:disabled) { border-color: #f4d78a; background: rgba(244, 215, 138, 0.1); }
+.room-row:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.room-row-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.room-row-info strong,
+.room-row-info span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-row-info span { font-size: 11px; color: #c9a561; }
+.room-row-code { font-weight: 800; letter-spacing: 3px; color: #ffe9a8; }
+.room-row-count { min-width: 36px; text-align: right; font-weight: 800; color: #7fe0d8; }
+
 .lobby-teams {
   display: grid;
   grid-template-columns: 1fr 1fr;

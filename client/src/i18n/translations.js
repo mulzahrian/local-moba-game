@@ -49,6 +49,10 @@ export const translations = {
     'join.codePlaceholder': 'Room code',
     'join.button': 'Join',
     'join.failed': 'Failed to join room: {message}',
+    'join.available': 'Available rooms',
+    'join.noRooms': 'No open rooms right now. Create one or enter a code.',
+    'join.listError': 'Could not load the room list. Is the server running?',
+    'join.codeLabel': 'Or enter a room code',
 
     'lobby.title': 'Game Lobby',
     'lobby.roomCode': 'Room Code',
@@ -488,6 +492,10 @@ export const translations = {
     'join.codePlaceholder': 'Kode room',
     'join.button': 'Gabung',
     'join.failed': 'Gagal bergabung ke room: {message}',
+    'join.available': 'Room yang tersedia',
+    'join.noRooms': 'Belum ada room terbuka. Buat room atau masukkan kode.',
+    'join.listError': 'Gagal memuat daftar room. Apakah server berjalan?',
+    'join.codeLabel': 'Atau masukkan kode room',
 
     'lobby.title': 'Lobi Permainan',
     'lobby.roomCode': 'Kode Room',

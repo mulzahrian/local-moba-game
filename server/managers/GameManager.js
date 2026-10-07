@@ -174,6 +174,7 @@ class GameManager {
     if (event.winnerTeam) {
       console.log(`[Combat] ${event.winnerTeam} destroyed the enemy tower in room ${room.code}`);
       this.io.to(room.code).emit('gameOver', { winnerTeam: event.winnerTeam });
+      this.removeRoom(room.code, 'game finished');
     }
     event.hits.filter((hit) => hit.died).forEach((hit) => {
       console.log(`[Combat] ${hit.targetId} was defeated by ${caster.id}`);
@@ -385,20 +386,32 @@ class GameManager {
             hostId: room.hostId
           });
         } else {
-          room.players = []; // computer players leave with the last human
-          // Delete empty room after a grace period (allows brief reconnects)
-          setTimeout(() => {
-            const r = this.rooms.get(roomCode);
-            if (r && r.players.length === 0) {
-              this.rooms.delete(roomCode);
-              console.log(`Room ${roomCode} deleted (empty for 60s)`);
-            }
-          }, 60000);
+          this.removeRoom(roomCode, 'everybody left'); // computer players leave with the last human
         }
         
         break;
       }
     }
+  }
+
+  // Drops a room (it disappears from the room list and stops ticking).
+  removeRoom(roomCode, reason) {
+    if (!this.rooms.delete(roomCode)) return;
+    console.log(`Room ${roomCode} deleted (${reason})`);
+  }
+
+  // Rooms a player can still join from the room list: multiplayer matches waiting in their lobby.
+  listOpenRooms() {
+    return this.getAllRooms()
+      .filter((room) => !room.singlePlayer && room.gameState === 'waiting')
+      .map((room) => ({
+        code: room.code,
+        hostName: room.players.find((p) => p.id === room.hostId)?.name || '',
+        mapName: room.map?.name || null,
+        teamSize: room.teamSize,
+        players: room.players.length,
+        maxPlayers: room.maxPlayers
+      }));
   }
 
   getAllRooms() {

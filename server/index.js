@@ -45,6 +45,11 @@ app.get('/health', (req, res) => {
   res.json({ status: 'Server is running' });
 });
 
+// Multiplayer rooms waiting for players (the room list in the Join menu)
+app.get('/api/rooms', (req, res) => {
+  res.json({ success: true, rooms: gameManager.listOpenRooms() });
+});
+
 // Map API (maps are stored as JSON files in server/data/maps)
 const handleMapError = (res, error) => {
   if (error instanceof MapValidationError) {
