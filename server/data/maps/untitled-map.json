@@ -1,0 +1,1454 @@
+{
+  "id": "untitled-map",
+  "name": "LORE",
+  "version": 1,
+  "size": 200,
+  "sky": "bright",
+  "weather": "clear",
+  "music": "list3",
+  "createdAt": "2026-10-06T14:08:29.864Z",
+  "updatedAt": "2026-10-06T15:02:05.244Z",
+  "objects": [
+    {
+      "uid": "o-muwr1ew6-b28vg",
+      "type": "custom:default-towers:crystal-tower",
+      "position": {
+        "x": -80,
+        "y": -10,
+        "z": -80
+      },
+      "rotationY": 0,
+      "scale": 1,
+      "animation": "Armature|Up and Down",
+      "tower": true
+    },
+    {
+      "uid": "o-muwr1kfl-mg73f",
+      "type": "custom:default-towers:water-tower",
+      "position": {
+        "x": 75,
+        "y": 5,
+        "z": 75
+      },
+      "rotationY": 0,
+      "scale": 1,
+      "animation": "Animated",
+      "tower": true
+    },
+    {
+      "uid": "o-muwr33rg-bkw85",
+      "type": "monster:slime-warden",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 1,
+      "animation": "lml_anim_idle",
+      "monster": true,
+      "aggroRange": 25
+    },
+    {
+      "uid": "o-muwr3cs1-dyor2",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2.2,
+      "animation": null
+    },
+    {
+      "uid": "o-muwr42v4-jaeqz",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2.85,
+      "animation": null
+    },
+    {
+      "uid": "o-muwr4gfs-sn9cv",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 3.3,
+      "animation": null
+    },
+    {
+      "uid": "o-muwr4i55-6zpir",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 3.3,
+      "animation": null
+    },
+    {
+      "uid": "o-muwr4uic-wlhnq",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -75,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2.95,
+      "animation": null
+    },
+    {
+      "uid": "o-muwr4w44-1ozu4",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -55,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2.95,
+      "animation": null
+    },
+    {
+      "uid": "o-muwr55k5-fr2hq",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -35,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2.7,
+      "animation": null
+    },
+    {
+      "uid": "o-muwr57fc-qy05d",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -10,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2.7,
+      "animation": null
+    },
+    {
+      "uid": "o-muwr5g67-bvanj",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 10,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 3.1,
+      "animation": null
+    },
+    {
+      "uid": "o-muwr5j84-ipghd",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 30,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 3.1,
+      "animation": null
+    },
+    {
+      "uid": "o-muwr5nug-9gg6e",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 50,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 3.25,
+      "animation": null
+    },
+    {
+      "uid": "o-muwr62np-drq7s",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 75,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrbbvw-1u8nl",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 3.5,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrbi3h-06gt8",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrbmlx-r0nkw",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2.75,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrbo33-eh9i8",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2.75,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrbq2y-jvh6e",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2.75,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrbs9p-ynlup",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2.75,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrbu3q-vo50r",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2.75,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrbvel-kkri7",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2.75,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrbwel-uqvov",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": -90
+      },
+      "rotationY": 0,
+      "scale": 2.75,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrbxml-hsmws",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": -70
+      },
+      "rotationY": 0,
+      "scale": 2.75,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrbz9w-fi9q6",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": -50
+      },
+      "rotationY": 0,
+      "scale": 2.75,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrc0w9-gryke",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": -25
+      },
+      "rotationY": 0,
+      "scale": 2.75,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrc3nh-x6ljt",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": -5
+      },
+      "rotationY": 0,
+      "scale": 2.75,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrc4ke-v9o6a",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": 15
+      },
+      "rotationY": 0,
+      "scale": 2.75,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrc5wx-172bw",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": 30
+      },
+      "rotationY": 0,
+      "scale": 2.75,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrc7at-lp1xy",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": 50
+      },
+      "rotationY": 0,
+      "scale": 2.75,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrc8d5-1ujvl",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": 70
+      },
+      "rotationY": 0,
+      "scale": 2.75,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrc9ml-uytad",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": 90
+      },
+      "rotationY": 0,
+      "scale": 2.75,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrccr1-u43cu",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 2.75,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrcecl-pjhal",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 2.75,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrhfmd-4xa1s",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 90,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2.4,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrhyi4-ll724",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 3.25,
+      "animation": null
+    },
+    {
+      "uid": "o-muwri11c-qysd0",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 3.25,
+      "animation": null
+    },
+    {
+      "uid": "o-muwri2bn-cvyax",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 3.25,
+      "animation": null
+    },
+    {
+      "uid": "o-muwri3dd-dm58l",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 3.25,
+      "animation": null
+    },
+    {
+      "uid": "o-muwri4un-qzuvl",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 3.25,
+      "animation": null
+    },
+    {
+      "uid": "o-muwri632-1ve5r",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 3.25,
+      "animation": null
+    },
+    {
+      "uid": "o-muwri7ox-stsjk",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 3.25,
+      "animation": null
+    },
+    {
+      "uid": "o-muwri9xo-26cfn",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 3.25,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrid3h-x591d",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 75,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 3.25,
+      "animation": null
+    },
+    {
+      "uid": "o-muwriels-59pxq",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 35,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 3.25,
+      "animation": null
+    },
+    {
+      "uid": "o-muwriftc-wdzf0",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 10,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 1.75,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrihcg-6rned",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -25,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 3.25,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrii65-jzk6t",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -55,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 3.25,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrijl0-odl68",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -90,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 3.25,
+      "animation": null
+    },
+    {
+      "uid": "o-muwril40-gz25t",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 3.25,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrizek-qhhn0",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 3.1,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrj76k-vvouc",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 2.95,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrju14-a1m0f",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 3.15,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrjz7j-o84eg",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 2.95,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrk4r8-ziwq4",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": 95
+      },
+      "rotationY": 0,
+      "scale": 2.95,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrkb38-8pr0w",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 2.95,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrkchf-0irb1",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 2.95,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrkp88-vsvxp",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": 60
+      },
+      "rotationY": 0,
+      "scale": 2.95,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrktb0-x97xw",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": 30
+      },
+      "rotationY": 0,
+      "scale": 2.95,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrkz6l-54bqq",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -90,
+        "y": 0,
+        "z": -5
+      },
+      "rotationY": 0,
+      "scale": 2.95,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrl574-ur4wm",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": -40
+      },
+      "rotationY": 0,
+      "scale": 2.95,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrl9ub-dxo62",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": -80
+      },
+      "rotationY": 0,
+      "scale": 2.95,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrlekv-kpwe7",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": -60
+      },
+      "rotationY": 0,
+      "scale": 2.95,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrli5o-ezwh9",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2.95,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrlml7-z3hkc",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2.95,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrlpqj-0qd8n",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2.95,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrlu6b-pkw5z",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2.95,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrpa58-skp0q",
+      "type": "custom:bush:stylized-bush",
+      "position": {
+        "x": -85,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 1,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrpeyd-93bvk",
+      "type": "custom:bush:stylized-bush",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 1,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrplwo-lz0l5",
+      "type": "custom:bush:stylized-bush",
+      "position": {
+        "x": -95,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 1,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrpuw6-lqbze",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -90,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2.75,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrs2pc-nxbaf",
+      "type": "custom:rock:fantasy-rock",
+      "position": {
+        "x": -85,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 1.65,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrsv8t-5xtai",
+      "type": "custom:rock:fantasy-rock",
+      "position": {
+        "x": -85,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": -50,
+      "rotationX": -15,
+      "scale": 1.65,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrt8ye-oz5xa",
+      "type": "custom:rock:fantasy-rock",
+      "position": {
+        "x": -95,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 80,
+      "rotationX": 20,
+      "rotationZ": 15,
+      "scale": 1.65,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrvd77-i3h99",
+      "type": "custom:rock:fantasy-rock",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": -50
+      },
+      "rotationY": 80,
+      "rotationX": 20,
+      "rotationZ": 15,
+      "scale": 1.65,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrvhrm-cjuxe",
+      "type": "custom:rock:fantasy-rock",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": -35
+      },
+      "rotationY": 110,
+      "rotationX": 20,
+      "rotationZ": 15,
+      "scale": 1.65,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrvnka-2ac31",
+      "type": "custom:rock:fantasy-rock",
+      "position": {
+        "x": -95,
+        "y": 0,
+        "z": -15
+      },
+      "rotationY": 110,
+      "rotationX": 20,
+      "rotationZ": -10,
+      "scale": 1.65,
+      "animation": null
+    },
+    {
+      "uid": "o-muwrxi1t-rluai",
+      "type": "custom:rock:stylized-rocks-with-magic-rune",
+      "position": {
+        "x": -75,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 10,
+      "animation": null
+    },
+    {
+      "uid": "o-muwry2jf-ddx5g",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -75,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2.45,
+      "animation": null
+    },
+    {
+      "uid": "o-muwryaoz-v83an",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -35,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2.45,
+      "animation": null
+    },
+    {
+      "uid": "o-muwryes4-6tbbk",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 10,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2.45,
+      "animation": null
+    },
+    {
+      "uid": "o-muwryjcc-8k3fz",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -10,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 0,
+      "scale": 2.45,
+      "animation": null
+    },
+    {
+      "uid": "o-muws10sv-1rr7c",
+      "type": "custom:rock:modular-rock-01",
+      "position": {
+        "x": -25,
+        "y": 0,
+        "z": -75
+      },
+      "rotationY": 25,
+      "scale": 3.15,
+      "animation": null
+    },
+    {
+      "uid": "o-muws1fb2-w6a7t",
+      "type": "custom:rock:modular-rock-01",
+      "position": {
+        "x": 10,
+        "y": 20,
+        "z": -40
+      },
+      "rotationY": 25,
+      "scale": 3,
+      "animation": null
+    },
+    {
+      "uid": "o-muws1l4f-bcbzh",
+      "type": "custom:rock:modular-rock-01",
+      "position": {
+        "x": -50,
+        "y": 0,
+        "z": -5
+      },
+      "rotationY": 25,
+      "scale": 3.3,
+      "animation": null
+    },
+    {
+      "uid": "o-muws1udt-f3gcf",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 5,
+        "y": 0,
+        "z": -80
+      },
+      "rotationY": 0,
+      "scale": 3.8,
+      "animation": null
+    },
+    {
+      "uid": "o-muws1x29-zwoj6",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 35,
+        "y": 0,
+        "z": -35
+      },
+      "rotationY": 0,
+      "scale": 1.9,
+      "animation": null
+    },
+    {
+      "uid": "o-muws1ypt-10pxl",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -85,
+        "y": 0,
+        "z": 65
+      },
+      "rotationY": 0,
+      "scale": 3.8,
+      "animation": null
+    },
+    {
+      "uid": "o-muws1zy9-0st3b",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -65,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 3.8,
+      "animation": null
+    },
+    {
+      "uid": "o-muws21l8-ds3dt",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": 85
+      },
+      "rotationY": 0,
+      "scale": 3.8,
+      "animation": null
+    },
+    {
+      "uid": "o-muws22z4-qgie1",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": -60
+      },
+      "rotationY": 0,
+      "scale": 3.8,
+      "animation": null
+    },
+    {
+      "uid": "o-muws26pk-m7vs4",
+      "type": "custom:rock:fantasy-rock",
+      "position": {
+        "x": 45,
+        "y": 0,
+        "z": 0
+      },
+      "rotationY": 110,
+      "rotationX": 20,
+      "rotationZ": 15,
+      "scale": 1.65,
+      "animation": null
+    },
+    {
+      "uid": "o-muws2b51-h3s2u",
+      "type": "custom:rock:fantasy-rock",
+      "position": {
+        "x": 20,
+        "y": 0,
+        "z": 30
+      },
+      "rotationY": 110,
+      "rotationX": 20,
+      "rotationZ": 15,
+      "scale": 1.65,
+      "animation": null
+    },
+    {
+      "uid": "o-muws3ufz-17y0j",
+      "type": "custom:rock:ancient-rune-stone",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": 10
+      },
+      "rotationY": 0,
+      "scale": 3.5,
+      "animation": null
+    },
+    {
+      "uid": "o-muws6ev5-43rsr",
+      "type": "custom:rock:stylized-temple-wall",
+      "position": {
+        "x": -5,
+        "y": 0,
+        "z": 10
+      },
+      "rotationY": 30,
+      "scale": 2.45,
+      "animation": null
+    },
+    {
+      "uid": "o-muws6mrj-kv8nu",
+      "type": "custom:rock:stylized-temple-wall",
+      "position": {
+        "x": -30,
+        "y": 0,
+        "z": 25
+      },
+      "rotationY": 30,
+      "scale": 2.45,
+      "animation": null
+    },
+    {
+      "uid": "o-muws98pq-mxsm2",
+      "type": "custom:rock:lowpoly-stone-statue-swordman",
+      "position": {
+        "x": 60,
+        "y": 5,
+        "z": 25
+      },
+      "rotationY": 15.504,
+      "rotationX": 14.478,
+      "rotationZ": 3.967,
+      "scale": 2.45,
+      "animation": null
+    },
+    {
+      "uid": "o-muws9ipe-iqlvn",
+      "type": "custom:rock:lowpoly-stone-statue-swordman",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": -65
+      },
+      "rotationY": 5,
+      "rotationZ": 5,
+      "scale": 3.3,
+      "animation": null
+    },
+    {
+      "uid": "o-muws9nn2-yuw89",
+      "type": "custom:rock:lowpoly-stone-statue-swordman",
+      "position": {
+        "x": -80,
+        "y": 0,
+        "z": 0
+      },
+      "rotationY": 65,
+      "rotationZ": 5,
+      "scale": 3.3,
+      "animation": null
+    },
+    {
+      "uid": "o-muws9pvn-jekp6",
+      "type": "custom:rock:lowpoly-stone-statue-swordman",
+      "position": {
+        "x": -50,
+        "y": 0,
+        "z": 50
+      },
+      "rotationY": 140,
+      "rotationZ": 5,
+      "scale": 3.3,
+      "animation": null
+    },
+    {
+      "uid": "o-muws9th1-1wn3i",
+      "type": "custom:rock:lowpoly-stone-statue-swordman",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": -100
+      },
+      "rotationY": 260,
+      "rotationZ": 5,
+      "scale": 3.3,
+      "animation": null
+    },
+    {
+      "uid": "o-muws9whv-3ujz5",
+      "type": "custom:rock:lowpoly-stone-statue-swordman",
+      "position": {
+        "x": 15,
+        "y": 0,
+        "z": -20
+      },
+      "rotationY": 290,
+      "rotationZ": 5,
+      "scale": 3.3,
+      "animation": null
+    },
+    {
+      "uid": "o-muwscccf-3ktd1",
+      "type": "custom:rock:stylized-rock",
+      "position": {
+        "x": 40,
+        "y": 0,
+        "z": -15
+      },
+      "rotationY": 0,
+      "scale": 2.75,
+      "animation": null
+    },
+    {
+      "uid": "o-muwsd2nu-w62f9",
+      "type": "custom:rock:stylized-rock",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": 20
+      },
+      "rotationY": 0,
+      "scale": 5.35,
+      "animation": null
+    },
+    {
+      "uid": "o-muwsdb8u-fkxxq",
+      "type": "custom:rock:stylized-rock",
+      "position": {
+        "x": -100,
+        "y": 0,
+        "z": 90
+      },
+      "rotationY": 0,
+      "scale": 5.35,
+      "animation": null
+    },
+    {
+      "uid": "o-muwsf1nf-rf6pr",
+      "type": "custom:rock:stylized-rock-1",
+      "position": {
+        "x": -60,
+        "y": 0,
+        "z": 30
+      },
+      "rotationY": 75,
+      "scale": 2.45,
+      "animation": null
+    },
+    {
+      "uid": "o-muwsf5yz-cia9w",
+      "type": "custom:rock:stylized-rock-1",
+      "position": {
+        "x": 75,
+        "y": 0,
+        "z": -80
+      },
+      "rotationY": 135,
+      "scale": 2.45,
+      "animation": null
+    },
+    {
+      "uid": "o-muwsfb6g-gqlcn",
+      "type": "custom:rock:stylized-rock-1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": 40
+      },
+      "rotationY": 165,
+      "scale": 2.45,
+      "animation": null
+    },
+    {
+      "uid": "o-muwsfdy3-f3dss",
+      "type": "custom:rock:stylized-rock-1",
+      "position": {
+        "x": -60,
+        "y": 0,
+        "z": 60
+      },
+      "rotationY": 210,
+      "scale": 2.45,
+      "animation": null
+    },
+    {
+      "uid": "o-muwsffpn-3dnai",
+      "type": "custom:rock:stylized-rock-1",
+      "position": {
+        "x": 100,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 240,
+      "scale": 2.45,
+      "animation": null
+    },
+    {
+      "uid": "o-muwsfihn-m5k4c",
+      "type": "custom:rock:stylized-rock-1",
+      "position": {
+        "x": -10,
+        "y": 0,
+        "z": 60
+      },
+      "rotationY": 285,
+      "scale": 1.3,
+      "animation": null
+    },
+    {
+      "uid": "o-muwsfywh-7p5dj",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 15,
+        "y": 0,
+        "z": 100
+      },
+      "rotationY": 0,
+      "scale": 3.85,
+      "animation": null
+    },
+    {
+      "uid": "o-muwsg0wd-mcl0q",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -75,
+        "y": 0,
+        "z": -35
+      },
+      "rotationY": 0,
+      "scale": 3.85,
+      "animation": null
+    },
+    {
+      "uid": "o-muwsnr9a-p1w96",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -5,
+        "y": 0,
+        "z": -30
+      },
+      "rotationY": 0,
+      "scale": 1.9,
+      "animation": null
+    },
+    {
+      "uid": "o-muwsnvcz-htr29",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": -45,
+        "y": 0,
+        "z": 30
+      },
+      "rotationY": 0,
+      "scale": 1.9,
+      "animation": null
+    },
+    {
+      "uid": "o-muwsnzsq-z5jgk",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 25,
+        "y": 0,
+        "z": 55
+      },
+      "rotationY": 0,
+      "scale": 1.9,
+      "animation": null
+    },
+    {
+      "uid": "o-muwso3d7-13lj1",
+      "type": "custom:default-trees:tree1",
+      "position": {
+        "x": 75,
+        "y": 0,
+        "z": -5
+      },
+      "rotationY": 0,
+      "scale": 1.9,
+      "animation": null
+    }
+  ],
+  "paths": []
+}
