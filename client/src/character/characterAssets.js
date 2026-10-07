@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { BUILTIN_CHARACTER_ID, DEFAULT_GENDER, DEFAULT_ROLE, getRoleConfig } from '../../../shared/characterConfig.js';
+import { BUILTIN_CHARACTER_ID, BUILTIN_CHARACTER_NAME, DEFAULT_GENDER, DEFAULT_ROLE, getRoleConfig } from '../../../shared/characterConfig.js';
 import builtinModelUrl from '../model/rimuru_tempest.glb?url';
 import { characterApi } from './characterApi.js';
 
@@ -9,7 +9,7 @@ export const CHARACTER_HEIGHT = 3.6; // world units every custom model is auto-f
 
 const BUILTIN_CHARACTER = {
   id: BUILTIN_CHARACTER_ID,
-  name: 'Rimuru',
+  name: BUILTIN_CHARACTER_NAME,
   role: DEFAULT_ROLE,
   builtin: true,
   hasModel: true,

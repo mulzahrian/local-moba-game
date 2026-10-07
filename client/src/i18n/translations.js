@@ -427,6 +427,18 @@ export const translations = {
     'pick.builtin': 'Default hero',
     'pick.selectHint': 'Select a hero to see its 3D model',
 
+    'team.team1': 'Team 1',
+    'team.team2': 'Team 2',
+    'lobby.joinTeam': 'Join this team',
+    'lobby.start': 'Start Match',
+    'lobby.waitingHost': 'Waiting for the host to start...',
+    'lobby.emptySlot': 'Open slot',
+    'lobby.error.full': 'That team is full',
+    'lobby.error.characterTaken': 'A teammate already plays this character',
+    'lobby.error.notHost': 'Only the host can start the match',
+    'lobby.error.notFull': 'Every place must be taken before starting',
+    'lobby.error.invalid': 'This action is not possible right now',
+
     'hud.mana': 'Mana',
 
     'hud.leave': 'Leave'
@@ -853,6 +865,18 @@ export const translations = {
     'pick.loadError': 'Gagal memuat karakter. Apakah server berjalan?',
     'pick.builtin': 'Pahlawan bawaan',
     'pick.selectHint': 'Pilih pahlawan untuk melihat model 3D-nya',
+
+    'team.team1': 'Tim 1',
+    'team.team2': 'Tim 2',
+    'lobby.joinTeam': 'Gabung tim ini',
+    'lobby.start': 'Mulai Pertandingan',
+    'lobby.waitingHost': 'Menunggu host memulai...',
+    'lobby.emptySlot': 'Slot kosong',
+    'lobby.error.full': 'Tim itu sudah penuh',
+    'lobby.error.characterTaken': 'Rekan satu tim sudah memakai karakter ini',
+    'lobby.error.notHost': 'Hanya host yang bisa memulai pertandingan',
+    'lobby.error.notFull': 'Semua tempat harus terisi sebelum mulai',
+    'lobby.error.invalid': 'Aksi ini tidak bisa dilakukan sekarang',
 
     'hud.mana': 'Mana',
 

@@ -5,6 +5,7 @@ export const useGameStore = create((set) => ({
   roomCode: null,
   players: [],
   teamSize: 1, // N vs N of the current room
+  hostId: null, // the player who starts the match from the lobby
   currentPlayer: null,
   currentEnvironment: null, // { sky, weather } for the room (null = default)
   currentMap: null, // map JSON chosen for the room (null = default arena)
@@ -18,6 +19,7 @@ export const useGameStore = create((set) => ({
   setRoomCode: (code) => set({ roomCode: code }),
   setPlayers: (players) => set({ players }),
   setTeamSize: (teamSize) => set({ teamSize }),
+  setHostId: (hostId) => set({ hostId }),
   setCurrentPlayer: (player) => set({ currentPlayer: player }),
   setCurrentMap: (map) => set({ currentMap: map }),
   setCurrentEnvironment: (environment) => set({ currentEnvironment: environment }),
@@ -33,6 +35,7 @@ export const useGameStore = create((set) => ({
     roomCode: null,
     players: [],
     teamSize: 1,
+    hostId: null,
     currentPlayer: null,
     currentMap: null,
     currentEnvironment: null,

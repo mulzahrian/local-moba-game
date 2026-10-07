@@ -20,6 +20,8 @@ import { SUMMON_SOUND_EFFECT } from '../skill/summonEffects.js';
 import { getMonsterDefinition } from '../monster/monsterAssets.js';
 import { WorldActor } from '../world/WorldActor.js';
 import { useSkillStore } from '../store/skillStore.js';
+import { useSettingsStore } from '../store/settingsStore.js';
+import { translate } from '../i18n/index.js';
 
 const UNIT_SCALE = 0.25; // characters are drawn at 0.25x relative to the map; scales character-attached helpers
 const MOVE_SPEED = 45 * UNIT_SCALE; // units per second
@@ -628,21 +630,31 @@ export class GameScene {
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.05;
 
-    // Name label
+    // Name label: the player's name with a team + character header above it
+    const teamHex = `#${teamColor.toString(16).padStart(6, '0')}`;
+    const header = `${translate(useSettingsStore.getState().language, `team.${playerData.team}`)} • ${playerData.characterName || def.name}`;
     const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 64;
+    canvas.width = 384;
+    canvas.height = 96;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'white';
-    ctx.font = 'Bold 40px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText(playerData.name, 128, 45);
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.font = 'Bold 26px Arial';
+    ctx.strokeText(header, 192, 30, 370);
+    ctx.fillStyle = teamHex;
+    ctx.fillText(header, 192, 30, 370);
+    ctx.font = 'Bold 40px Arial';
+    ctx.strokeText(playerData.name, 192, 76, 370);
+    ctx.fillStyle = 'white';
+    ctx.fillText(playerData.name, 192, 76, 370);
 
     const texture = new THREE.CanvasTexture(canvas);
-    const labelGeometry = new THREE.PlaneGeometry(4, 1);
+    const labelGeometry = new THREE.PlaneGeometry(6, 1.5);
     const labelMaterial = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
     const label = new THREE.Mesh(labelGeometry, labelMaterial);
-    label.position.y = 17 * UNIT_SCALE;
+    label.position.y = 17 * UNIT_SCALE + 0.3;
 
     // Group holds everything at the world position; only `model` rotates to face movement,
     // keeping the ring and name label upright/non-rotated.

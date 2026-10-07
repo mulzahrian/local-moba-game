@@ -98,6 +98,15 @@ class SocketService {
     });
   }
 
+  // Lobby: move to the other team / start the match (host only). The callback gets { success, code }.
+  switchTeam(roomCode, team, callback) {
+    this.socket?.emit('switchTeam', { roomCode, team }, (response) => callback?.(response));
+  }
+
+  startGame(roomCode, callback) {
+    this.socket?.emit('startGame', { roomCode }, (response) => callback?.(response));
+  }
+
   // Game Events
   playerMove(x, z) {
     // Note: roomCode is managed by store and passed separately when needed

@@ -1,4 +1,4 @@
-import { BUILTIN_CHARACTER_ID, DEFAULT_ROLE, MANA_REGEN_PER_SECOND, RESPAWN_SECONDS, getRoleConfig } from '../../shared/characterConfig.js';
+import { BUILTIN_CHARACTER_ID, BUILTIN_CHARACTER_NAME, DEFAULT_ROLE, MANA_REGEN_PER_SECOND, RESPAWN_SECONDS, getRoleConfig } from '../../shared/characterConfig.js';
 import { DEFAULT_MAP_SIZE, buildTowers, getSpawnPosition, getTowerForTeam } from '../../shared/mapConfig.js';
 import { DEFAULT_TEAM_SIZE, TEAMS } from '../../shared/matchConfig.js';
 import { BOT_TICK_MS, pickBotName, tickBots } from './bots.js';
@@ -20,6 +20,7 @@ function createPlayer(id, name, team, slot, position, character, isBot = false) 
     slot, // spawn place within the team
     isBot,
     characterId: character.id,
+    characterName: character.name,
     role: character.role,
     health: maxHealth,
     maxHealth,
@@ -188,34 +189,85 @@ class GameManager {
     return event;
   }
 
-  // Team with free places and the fewest players (team1 on a tie); null when both teams are full.
-  pickTeam(room) {
-    const open = TEAMS.map((team) => ({ team, count: room.players.filter((p) => p.team === team).length }))
-      .filter(({ count }) => count < room.teamSize)
-      .sort((a, b) => a.count - b.count);
-    return open[0]?.team || null;
+  // Why a player cannot take a place in a team: 'full', 'characterTaken' (a teammate already plays that
+  // character) or null when the place is free. `playerId` is ignored so a player can be checked for their own team.
+  teamBlocker(room, team, characterId, playerId = null) {
+    const members = room.players.filter((p) => p.team === team && p.id !== playerId);
+    if (members.length >= room.teamSize) return 'full';
+    if (characterId && members.some((p) => p.characterId === characterId)) return 'characterTaken';
+    return null;
   }
 
-  addPlayer(room, id, name, character, isBot = false) {
-    const team = this.pickTeam(room);
-    if (!team) return null;
-    const used = new Set(room.players.filter((p) => p.team === team).map((p) => p.slot));
+  // Team with a free place the character may take and the fewest players (team1 on a tie).
+  // Null when there is none; `reason` says whether the teams are full or the character is taken.
+  pickTeam(room, characterId = null) {
+    const blockers = TEAMS.map((team) => ({ team, blocker: this.teamBlocker(room, team, characterId) }));
+    const open = blockers
+      .filter(({ blocker }) => !blocker)
+      .map(({ team }) => ({ team, count: room.players.filter((p) => p.team === team).length }))
+      .sort((a, b) => a.count - b.count);
+    if (open.length) return { team: open[0].team, reason: null };
+    return { team: null, reason: blockers.some(({ blocker }) => blocker === 'characterTaken') ? 'characterTaken' : 'full' };
+  }
+
+  // First spawn slot of the team nobody else uses, and the matching spawn point.
+  placeInTeam(room, team, playerId = null) {
+    const used = new Set(room.players.filter((p) => p.team === team && p.id !== playerId).map((p) => p.slot));
     let slot = 0;
     while (used.has(slot)) slot += 1;
-
     const spawn = getSpawnPosition(getTowerForTeam(room.towers, team), room.map?.size || DEFAULT_MAP_SIZE, slot);
-    const player = createPlayer(id, name, team, slot, spawn, character, isBot);
-    room.players.push(player);
-    return player;
+    return { slot, spawn };
   }
 
-  // Fills every free place of a single-player match with computer players.
+  // Adds a player to the given team, or to the best open team when none is given. Returns { player } or { error }.
+  addPlayer(room, id, name, character, isBot = false, team = null) {
+    let error = null;
+    if (!team) ({ team, reason: error } = this.pickTeam(room, character.id));
+    else error = this.teamBlocker(room, team, character.id);
+    if (error || !team) return { error: error || 'full' };
+
+    const { slot, spawn } = this.placeInTeam(room, team);
+    const player = createPlayer(id, name, team, slot, spawn, character, isBot);
+    room.players.push(player);
+    return { player };
+  }
+
+  // Moves a waiting player to the other team (spawn point included) when it has room for their character.
+  switchTeam(room, playerId, team) {
+    const player = room.players.find((p) => p.id === playerId);
+    if (!player || room.gameState !== 'waiting' || !TEAMS.includes(team)) return { error: 'invalid' };
+    if (player.team === team) return { player };
+    const error = this.teamBlocker(room, team, player.characterId, playerId);
+    if (error) return { error };
+
+    const { slot, spawn } = this.placeInTeam(room, team, playerId);
+    Object.assign(player, { team, slot, position: spawn, spawn: { ...spawn } });
+    return { player };
+  }
+
+  // Only the host starts a match, once every place of both teams is taken.
+  startGame(room, playerId) {
+    if (room.hostId !== playerId) return { error: 'notHost' };
+    if (room.gameState !== 'waiting') return { error: 'invalid' };
+    if (room.players.length < room.maxPlayers) return { error: 'notFull' };
+    room.gameState = 'in_progress';
+    return { room };
+  }
+
+  // Fills every free place of a single-player match with computer players. Bots avoid characters their
+  // team already has (and only repeat one when the team has run out of different characters).
   fillWithBots(room, characters) {
-    const pool = characters?.length ? characters : [{ id: BUILTIN_CHARACTER_ID, role: DEFAULT_ROLE }];
+    const pool = characters?.length ? characters : [{ id: BUILTIN_CHARACTER_ID, name: BUILTIN_CHARACTER_NAME, role: DEFAULT_ROLE }];
     while (room.players.length < room.maxPlayers) {
-      const character = pool[Math.floor(Math.random() * pool.length)];
+      const { team } = this.pickTeam(room);
+      if (!team) break;
+      const taken = new Set(room.players.filter((p) => p.team === team).map((p) => p.characterId));
+      const fresh = pool.filter((c) => !taken.has(c.id));
+      const choices = fresh.length ? fresh : pool;
+      const character = choices[Math.floor(Math.random() * choices.length)];
       this.botCounter += 1;
-      if (!this.addPlayer(room, `bot-${this.botCounter}`, pickBotName(this.botCounter), character, true)) break;
+      const { slot, spawn } = this.placeInTeam(room, team);
+      room.players.push(createPlayer(`bot-${this.botCounter}`, pickBotName(this.botCounter), team, slot, spawn, character, true));
     }
   }
 
@@ -291,27 +343,24 @@ class GameManager {
     return room;
   }
 
+  // Adds a player to a waiting room. Returns { room } or { error } ('notFound', 'full' or 'characterTaken').
   joinRoom(roomCode, playerId, playerName, character) {
     console.log(`  [GameManager] Looking up room with code: "${roomCode}"`);
     const room = this.rooms.get(roomCode);
 
     if (!room || room.singlePlayer || room.gameState !== 'waiting') {
       console.log(`  [GameManager] ? Room "${roomCode}" not found or not open for joining`);
-      return null;
+      return { error: 'notFound' };
     }
 
-    if (room.players.length >= room.maxPlayers || !this.addPlayer(room, playerId, playerName, character)) {
-      console.log(`  [GameManager] ? Room is full: ${room.players.length}/${room.maxPlayers}`);
-      return null;
+    const { error } = this.addPlayer(room, playerId, playerName, character);
+    if (error) {
+      console.log(`  [GameManager] ? Cannot join room (${error}): ${room.players.length}/${room.maxPlayers}`);
+      return { error };
     }
 
     console.log(`  [GameManager] ? Player added. Room now: ${room.players.length}/${room.maxPlayers}`);
-
-    if (room.players.length === room.maxPlayers) {
-      room.gameState = 'in_progress';
-    }
-
-    return room;
+    return { room };
   }
   getRoom(roomCode) {
     return this.rooms.get(roomCode);
@@ -329,9 +378,11 @@ class GameManager {
         console.log(`Player ${disconnectedPlayer.name} disconnected from room ${roomCode} (${room.players.length} left)`);
 
         if (this.hasHumans(room)) {
+          if (room.hostId === playerId) room.hostId = room.players.find((p) => !p.isBot).id;
           this.io.to(roomCode).emit('playerDisconnected', { 
             playerId,
-            remainingPlayers: room.players 
+            remainingPlayers: room.players,
+            hostId: room.hostId
           });
         } else {
           room.players = []; // computer players leave with the last human

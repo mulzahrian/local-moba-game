@@ -1,6 +1,7 @@
 // Character roles, skills and animation slots shared by the client and the server.
 
 export const BUILTIN_CHARACTER_ID = 'builtin-rimuru';
+export const BUILTIN_CHARACTER_NAME = 'Rimuru';
 
 export const ROLES = ['fighter', 'mage', 'assassin', 'support', 'marksman'];
 export const DEFAULT_ROLE = 'fighter';

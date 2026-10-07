@@ -13,7 +13,7 @@ import { ensureSkillLibrary, getSkill, refreshSkillLibrary } from './skill/skill
 import { RewardToasts } from './components/RewardToasts.jsx';
 import { audioService } from './services/audioService.js';
 import { MenuBackdrop } from './components/MenuBackdrop.jsx';
-import { MagicLoader } from './components/MagicLoader.jsx';
+import { LobbyView } from './components/LobbyView.jsx';
 import { GameResultOverlay } from './components/GameResultOverlay.jsx';
 import { useSettingsStore } from './store/settingsStore.js';
 import { translate, useT } from './i18n/index.js';
@@ -31,6 +31,8 @@ function App() {
   const players = useGameStore((state) => state.players);
   const teamSize = useGameStore((state) => state.teamSize);
   const setTeamSize = useGameStore((state) => state.setTeamSize);
+  const hostId = useGameStore((state) => state.hostId);
+  const setHostId = useGameStore((state) => state.setHostId);
   const currentPlayer = useGameStore((state) => state.currentPlayer);
   const messages = useGameStore((state) => state.messages);
   const [gameResult, setGameResult] = useState(null); // { winnerTeam } once a tower has fallen
@@ -93,6 +95,12 @@ function App() {
     socketService.on('playerJoined', (data) => {
       console.log('Player joined:', data);
       setPlayers(data.players);
+    });
+
+    // Somebody switched team in the lobby
+    socketService.on('lobbyUpdated', (data) => {
+      setPlayers(data.players);
+      setHostId(data.hostId);
     });
 
     socketService.on('gameStarted', (data) => {
@@ -195,6 +203,7 @@ function App() {
       console.log('Player disconnected:', data);
       const remaining = useGameStore.getState().players.filter(p => p.id !== data.playerId);
       setPlayers(remaining);
+      if (data.hostId) setHostId(data.hostId);
       if (gameSceneRef.current) {
         gameSceneRef.current.removePlayer(data.playerId);
       }
@@ -249,6 +258,7 @@ function App() {
         });
         setPlayers(response.room.players);
         setTeamSize(response.room.teamSize);
+        setHostId(response.room.hostId);
         // A single-player match starts right away (the computer fills the other places)
         setGameState(response.room.gameState === 'in_progress' ? 'in_game' : 'room_lobby');
       } else {
@@ -272,12 +282,13 @@ function App() {
         });
         setPlayers(response.room.players);
         setTeamSize(response.room.teamSize);
-        // Wait in the lobby until every place is taken (the server then sends gameStarted)
+        setHostId(response.room.hostId);
+        // Wait in the lobby (pick a team there) until the host starts the match (the server then sends gameStarted)
         // Scene creation is handled by the gameState effect
         setGameState(response.room.gameState === 'in_progress' ? 'in_game' : 'room_lobby');
       } else {
         console.error(`[Client] Failed to join room: ${response.message}`);
-        alert(t('join.failed', { message: response.message }));
+        alert(t('join.failed', { message: response.code === 'characterTaken' ? t('lobby.error.characterTaken') : response.message }));
       }
     });
   };
@@ -308,30 +319,14 @@ function App() {
 
       {gameState === 'room_lobby' && (
         <MenuBackdrop>
-          <div className="menu-panel lobby-box">
-            <h2 className="panel-title">{t('lobby.title')}</h2>
-            <p className="lobby-meta">{t('lobby.roomCode')}</p>
-            <div className="lobby-code">{roomCode}</div>
-            <p className="lobby-meta">
-              {t('lobby.map')}: {currentMap ? currentMap.name : t('create.defaultMap')}
-            </p>
-            <p className="lobby-meta">{t('lobby.players')}: {players.length}/{teamSize * 2} ({teamSize}v{teamSize})</p>
-            <div className="lobby-players">
-              {players.map((player) => (
-                <div key={player.id} className="lobby-player">
-                  <span>{player.name}</span>
-                  <span className={`team-badge ${player.team}`}>{player.team}</span>
-                </div>
-              ))}
-            </div>
-            <MagicLoader />
-            <p className="lobby-waiting">{t('lobby.waiting')}</p>
-            <div className="menu-buttons">
-              <button className="fantasy-btn ghost" onClick={handleLeaveRoom}>
-                {t('common.cancel')}
-              </button>
-            </div>
-          </div>
+          <LobbyView
+            roomCode={roomCode}
+            mapName={currentMap ? currentMap.name : t('create.defaultMap')}
+            players={players}
+            teamSize={teamSize}
+            hostId={hostId}
+            onLeave={handleLeaveRoom}
+          />
         </MenuBackdrop>
       )}
 

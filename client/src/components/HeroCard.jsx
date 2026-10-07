@@ -41,7 +41,9 @@ export function HeroCard({ player }) {
       <div className="hero-body">
         <div className="hero-name">
           <strong>{player.name}</strong>
-          <span>{player.role ? t(`role.${player.role}`) : ''}</span>
+          <span title={player.role ? t(`role.${player.role}`) : ''}>
+            {[player.team && t(`team.${player.team}`), player.characterName].filter(Boolean).join(' • ')}
+          </span>
         </div>
 
         <div className={`hero-bar hp ${low ? 'low' : ''}`} title={t('hud.health')}>

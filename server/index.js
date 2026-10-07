@@ -19,7 +19,7 @@ import monsterStore from './managers/MonsterStore.js';
 import { isMonsterObject, monsterIdOfType } from '../shared/monsterConfig.js';
 import { setLoadout } from './managers/loadouts.js';
 import { sanitizeTeamSize } from '../shared/matchConfig.js';
-import { BUILTIN_CHARACTER_ID, DEFAULT_ROLE } from '../shared/characterConfig.js';
+import { BUILTIN_CHARACTER_ID, BUILTIN_CHARACTER_NAME, DEFAULT_ROLE } from '../shared/characterConfig.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -477,17 +477,19 @@ async function loadMapMonsters(map) {
   const ids = (map?.objects || []).filter(isMonsterObject).map((object) => monsterIdOfType(object.type)).filter(Boolean);
   return monsterStore.getMany(ids);
 }
+const BUILTIN_CHARACTER = { id: BUILTIN_CHARACTER_ID, name: BUILTIN_CHARACTER_NAME, role: DEFAULT_ROLE };
+
 // Resolves the character a player picked into the data the room needs (null when it does not exist).
 async function resolveCharacter(characterId) {
-  if (characterId === BUILTIN_CHARACTER_ID) return { id: BUILTIN_CHARACTER_ID, role: DEFAULT_ROLE };
+  if (characterId === BUILTIN_CHARACTER_ID) return BUILTIN_CHARACTER;
   const character = await characterStore.get(characterId);
-  return character?.hasModel ? { id: character.id, role: character.role } : null;
+  return character?.hasModel ? { id: character.id, name: character.name, role: character.role } : null;
 }
 
 // Characters the computer players can pick: the built-in one plus every character that has a model.
 async function listBotCharacters() {
   const characters = (await characterStore.list()).filter((character) => character.hasModel);
-  return [{ id: BUILTIN_CHARACTER_ID, role: DEFAULT_ROLE }, ...characters.map(({ id, role }) => ({ id, role }))];
+  return [BUILTIN_CHARACTER, ...characters.map(({ id, name, role }) => ({ id, name, role }))];
 }
 
 // Socket.IO Events
@@ -602,8 +604,8 @@ io.on('connection', (socket) => {
         return;
       }
 
-      const room = gameManager.joinRoom(normalizedRoomCode, socket.id, playerName, character);
-      console.log(`[JoinRoom] gameManager.joinRoom returned:`, room ? 'ROOM OBJECT' : 'NULL');
+      const { room, error: joinError } = gameManager.joinRoom(normalizedRoomCode, socket.id, playerName, character);
+      console.log(`[JoinRoom] gameManager.joinRoom returned:`, room ? 'ROOM OBJECT' : joinError);
 
       if (room) {
         console.log(`[JoinRoom] ✅ SUCCESS - Room found!`);
@@ -623,17 +625,6 @@ io.on('connection', (socket) => {
           players: room.players
         });
         console.log(`[JoinRoom] playerJoined event emitted`);
-          
-        // If room is now full, start the game
-        if (room.players.length === room.maxPlayers) {
-          console.log(`[JoinRoom] 🎮 Game starting in room ${normalizedRoomCode}!`);
-          io.to(normalizedRoomCode).emit('gameStarted', {
-            roomCode: normalizedRoomCode,
-            players: room.players,
-            map: room.map,
-            environment: room.environment
-          });
-        }
         
         console.log(`[JoinRoom] Sending callback with success=true`);
         if (typeof ack === 'function') {
@@ -644,13 +635,17 @@ io.on('connection', (socket) => {
         }
         console.log(`[JoinRoom] ========== JOIN COMPLETE ==========\n`);
       } else {
-        console.log(`[JoinRoom] ❌ FAILED - gameManager.joinRoom returned null!`);
+        console.log(`[JoinRoom] ❌ FAILED - ${joinError}`);
         console.log(`[JoinRoom] Looked for room code: "${normalizedRoomCode}"`);
         console.log(`[JoinRoom] Available room codes: ${Array.from(gameManager.rooms.keys()).join(", ") || "NONE"}`);
         
         console.log(`[JoinRoom] Sending callback with success=false`);
         if (typeof ack === 'function') {
-          ack({ success: false, message: 'Room not found or full' });
+          ack({
+            success: false,
+            code: joinError,
+            message: joinError === 'characterTaken' ? 'A teammate already uses this character' : 'Room not found or full'
+          });
           console.log(`[JoinRoom] ✅ Callback executed with error`);
         } else {
           console.log(`[JoinRoom] ⚠️ ack is not a function!`);
@@ -665,6 +660,32 @@ io.on('connection', (socket) => {
       }
       console.log(`[JoinRoom] ========== ERROR ==========\n`);
     }
+  });
+
+  // Lobby: a waiting player moves to the other team (blocked when it is full or already has their character)
+  socket.on('switchTeam', (data, ack) => {
+    const room = gameManager.getRoom(data?.roomCode);
+    if (!room) return typeof ack === 'function' && ack({ success: false, code: 'invalid' });
+    const { error } = gameManager.switchTeam(room, socket.id, data.team);
+    if (error) return typeof ack === 'function' && ack({ success: false, code: error });
+    io.to(room.code).emit('lobbyUpdated', { players: room.players, hostId: room.hostId });
+    if (typeof ack === 'function') ack({ success: true });
+  });
+
+  // Lobby: the host starts the match once both teams are full
+  socket.on('startGame', (data, ack) => {
+    const room = gameManager.getRoom(data?.roomCode);
+    if (!room) return typeof ack === 'function' && ack({ success: false, code: 'invalid' });
+    const { error } = gameManager.startGame(room, socket.id);
+    if (error) return typeof ack === 'function' && ack({ success: false, code: error });
+    console.log(`[StartGame] 🎮 Game starting in room ${room.code}!`);
+    io.to(room.code).emit('gameStarted', {
+      roomCode: room.code,
+      players: room.players,
+      map: room.map,
+      environment: room.environment
+    });
+    if (typeof ack === 'function') ack({ success: true });
   });
 
   // Game Events

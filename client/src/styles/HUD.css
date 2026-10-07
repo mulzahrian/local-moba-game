@@ -165,6 +165,35 @@
 .player-item.team1 { border-left-color: #d9573a; }
 .player-item.team2 { border-left-color: #4aa3e0; }
 .player-item.current { background: rgba(244, 215, 138, 0.14); }
+.player-item.dead { opacity: 0.5; }
+
+.team-group { margin-bottom: 6px; }
+
+.team-group-header {
+  margin: 2px 0 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.team-group.team1 .team-group-header { color: #ff8a70; }
+.team-group.team2 .team-group-header { color: #7fd0ff; }
+
+.player-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.player-character {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  color: var(--gold);
+}
 
 .player-name {
   flex: 1;
@@ -317,6 +346,9 @@
 }
 
 .hero-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 10px;
   letter-spacing: 2px;
   text-transform: uppercase;
