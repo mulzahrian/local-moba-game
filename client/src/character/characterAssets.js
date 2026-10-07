@@ -42,7 +42,7 @@ export function isBuiltinCharacter(id) {
 }
 
 export async function listCharacters() {
-  return [BUILTIN_CHARACTER, ...(await characterApi.list())];
+  return [...(await characterApi.list()), BUILTIN_CHARACTER];
 }
 
 const definitionCache = new Map();

@@ -2,6 +2,7 @@ import React from 'react';
 import { EmberCanvas } from './EmberCanvas.jsx';
 import { useT } from '../i18n/index.js';
 import backgroundUrl from '../public/img/background.png';
+import logoUrl from '../public/img/rapp-moba.png';
 import '@fontsource/cinzel/600.css';
 import '@fontsource/cinzel/800.css';
 import '../styles/Menu.css';
@@ -17,6 +18,9 @@ export function MenuBackdrop({ children, wide = false }) {
 
       <div className={`menu-content ${wide ? 'wide' : ''}`}>
         <div className="menu-header">
+          <div className="menu-logo-wrap">
+            <img className="menu-logo" src={logoUrl} alt="RAPP MOBA" />
+          </div>
           <div className="title-ornament" />
           <h1 className="title">{t('app.title')}</h1>
           <p className="subtitle">{t('app.subtitle')}</p>

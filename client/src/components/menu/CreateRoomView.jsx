@@ -57,14 +57,6 @@ export function CreateRoomView({ onBack, onCreateRoom, singlePlayer = false }) {
       <h2 className="panel-title">{t(singlePlayer ? 'create.titleSingle' : 'create.title')}</h2>
 
       <div className="map-pick-list">
-        <button
-          className={`map-card ${selected === DEFAULT_MAP_ID ? 'selected' : ''}`}
-          onClick={() => selectMap(DEFAULT_MAP_ID, null)}
-        >
-          <span className="map-card-name">{t('create.defaultMap')}</span>
-          <span className="map-card-meta">{t('create.defaultMapDesc')}</span>
-        </button>
-
         {loading && <p className="hint">{t('common.loading')}</p>}
         {error && <p className="hint error">{error}</p>}
         {!loading && !error && maps.length === 0 && <p className="hint">{t('create.noMaps')}</p>}
@@ -79,6 +71,14 @@ export function CreateRoomView({ onBack, onCreateRoom, singlePlayer = false }) {
             <span className="map-card-meta">{map.objectCount} {t('common.objects')}</span>
           </button>
         ))}
+
+        <button
+          className={`map-card ${selected === DEFAULT_MAP_ID ? 'selected' : ''}`}
+          onClick={() => selectMap(DEFAULT_MAP_ID, null)}
+        >
+          <span className="map-card-name">{t('create.defaultMap')}</span>
+          <span className="map-card-meta">{t('create.defaultMapDesc')}</span>
+        </button>
       </div>
 
       <div className="setting-row">
