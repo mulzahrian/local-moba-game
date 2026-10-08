@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Fx, TAU, clamp01, easeOut, rand, registerEffects } from './effects.js';
 import './shotEffects.js';
 import './areaEffects.js';
+import './elementalEffects.js';
 
 /**
  * Effects of the basic attacks (attack 1 and attack 2) for every attack type: sword slashes,

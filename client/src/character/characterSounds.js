@@ -65,6 +65,36 @@ const REACTION_SOUNDS = { hit: hitSfx, knockback: knockSfx, pulled: pulledSfx };
 // Hurt voice by gender (folder music/effect/voice).
 const HIT_VOICES = { male: hitMaleVoice, female: hitFemaleVoice };
 
+// Elemental effects intentionally use a small randomized pool so repeated casts do not sound
+// identical. All entries are existing local SFX assets; no network audio is required.
+const ELEMENTAL_SOUNDS = {
+  elementFireBurst: [fireBurstPower, meteorPower, slashSfx, hitSfx],
+  elementFireSpiral: [fireBurstPower, windPower, meteorPower],
+  elementEmberRain: [fireBurstPower, meteorPower, hitSfx],
+  elementMagmaRing: [shockwavePower, fireBurstPower, knockSfx],
+  elementSolarFlare: [fireBurstPower, magicCirclePower, meteorPower],
+  elementWindBlade: [windPower, slashPower, slashSfx],
+  elementCycloneBurst: [windPower, shockwavePower, slashPower],
+  elementAirCutter: [slashPower, windPower, bowShootSfx],
+  elementStormEye: [windPower, lightningPower, magicCirclePower],
+  elementFeatherGale: [windPower, bowShootSfx, slashSfx],
+  elementStoneBurst: [shockwavePower, knockSfx, hitSfx],
+  elementTectonicRing: [shockwavePower, magicCirclePower, knockSfx],
+  elementCrystalWall: [iceNovaPower, magicCirclePower, hitSfx],
+  elementBoulderField: [shockwavePower, meteorPower, knockSfx],
+  elementQuakePulse: [shockwavePower, knockSfx, hitSfx],
+  elementWaterWhirlpool: [windPower, healingPower, magicCirclePower],
+  elementAquaLance: [arrowPower, windPower, bowShootSfx],
+  elementTidalBurst: [windPower, shockwavePower, healingPower],
+  elementBubblePrison: [magicCirclePower, healingPower, windPower],
+  elementRainCrescent: [healingPower, windPower, slashPower],
+  elementSparkBurst: [lightningPower, magicCirclePower, hitSfx],
+  elementThunderField: [lightningPower, shockwavePower, magicCirclePower],
+  elementChainLightning: [lightningPower, windPower, hitSfx],
+  elementVoltNova: [lightningPower, fireBurstPower, shockwavePower],
+  elementElectricCage: [lightningPower, magicCirclePower, knockSfx]
+};
+
 export const RUN_SOUND = runSfx;
 
 /** Plays the sound of an action (attack1/2, skill1-3 via its effect, jump). `volume` is 0-1. */
@@ -88,5 +118,10 @@ export function playReactionSound(def, reaction, volume = 1) {
 
 /** Skill effect sound on its own (used by the effect gallery in the character generator). */
 export function playPowerSound(effectId, volume = 1) {
+  const elemental = ELEMENTAL_SOUNDS[effectId];
+  if (elemental) {
+    audioService.playSfx(elemental[Math.floor(Math.random() * elemental.length)], volume);
+    return;
+  }
   (POWER_SOUNDS[effectId] || []).forEach((sound, i) => audioService.playSfx(sound, i === 0 ? volume : volume * LAYER_VOLUME));
 }

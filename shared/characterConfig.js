@@ -73,7 +73,37 @@ export const EFFECT_IDS = [
   'bloodNova',
   'runeSeal',
   'starfall',
-  'staticField'
+  'staticField',
+  // elemental character effects: fire
+  'elementFireBurst',
+  'elementFireSpiral',
+  'elementEmberRain',
+  'elementMagmaRing',
+  'elementSolarFlare',
+  // elemental character effects: wind
+  'elementWindBlade',
+  'elementCycloneBurst',
+  'elementAirCutter',
+  'elementStormEye',
+  'elementFeatherGale',
+  // elemental character effects: earth
+  'elementStoneBurst',
+  'elementTectonicRing',
+  'elementCrystalWall',
+  'elementBoulderField',
+  'elementQuakePulse',
+  // elemental character effects: water
+  'elementWaterWhirlpool',
+  'elementAquaLance',
+  'elementTidalBurst',
+  'elementBubblePrison',
+  'elementRainCrescent',
+  // elemental character effects: electric
+  'elementSparkBurst',
+  'elementThunderField',
+  'elementChainLightning',
+  'elementVoltNova',
+  'elementElectricCage'
 ];
 
 export const MAX_ANIMATION_NAME = 120;
