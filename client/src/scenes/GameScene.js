@@ -34,6 +34,10 @@ const CAMERA_FOLLOW_SMOOTHING = 8; // higher = camera catches up faster
 const CAMERA_ROTATE_SENSITIVITY = 0.008;
 const CAMERA_MIN_PITCH = THREE.MathUtils.degToRad(25);
 const CAMERA_MAX_PITCH = THREE.MathUtils.degToRad(78);
+const CAMERA_MIN_DISTANCE = 22;
+const CAMERA_MAX_DISTANCE = 72;
+const CAMERA_ROTATE_ZOOM_FACTOR = 0.76;
+const CAMERA_ZOOM_SMOOTHING = 12;
 const DEFAULT_ARENA_SIZE = 500;
 const NETWORK_SYNC_INTERVAL = 0.05; // seconds between position broadcasts (20Hz)
 const MOVE_EPSILON_SQ = 0.0005; // squared distance threshold to consider a remote player "moving"
@@ -113,6 +117,11 @@ export class GameScene {
       Math.hypot(CAMERA_OFFSET.x, CAMERA_OFFSET.z)
     );
     this.cameraDragging = false;
+    this.cameraDistanceTarget = THREE.MathUtils.clamp(
+      CAMERA_OFFSET.length(),
+      CAMERA_MIN_DISTANCE,
+      CAMERA_MAX_DISTANCE
+    );
     this.aimTarget = null;
     this.cameraShake = 0;
 
@@ -1296,10 +1305,19 @@ export class GameScene {
       this.renderer.domElement.style.cursor = '';
     };
     this.onContextMenu = (e) => e.preventDefault();
+    this.onWheel = (e) => {
+      e.preventDefault();
+      this.cameraDistanceTarget = THREE.MathUtils.clamp(
+        this.cameraDistanceTarget + e.deltaY * 0.045,
+        CAMERA_MIN_DISTANCE,
+        CAMERA_MAX_DISTANCE
+      );
+    };
     this.container.addEventListener('mousedown', this.onMouseDown);
     this.container.addEventListener('mousemove', this.onMove);
     window.addEventListener('mouseup', this.onMouseUp);
     this.container.addEventListener('contextmenu', this.onContextMenu);
+    this.container.addEventListener('wheel', this.onWheel, { passive: false });
   }
 
   updateMouse(event) {
@@ -1355,6 +1373,9 @@ export class GameScene {
       this.cameraFocus.lerp(target, 1 - Math.exp(-CAMERA_FOLLOW_SMOOTHING * delta));
     }
 
+    const zoomWhileRotating = this.cameraDragging ? CAMERA_ROTATE_ZOOM_FACTOR : 1;
+    const desiredDistance = this.cameraDistanceTarget * zoomWhileRotating;
+    this.cameraDistance += (desiredDistance - this.cameraDistance) * (1 - Math.exp(-CAMERA_ZOOM_SMOOTHING * delta));
     const horizontalDistance = this.cameraDistance * Math.cos(this.cameraPitch);
     const cameraOffset = new THREE.Vector3(
       Math.sin(this.cameraYaw) * horizontalDistance,
@@ -1423,6 +1444,7 @@ export class GameScene {
     this.container.removeEventListener('mousemove', this.onMove);
     window.removeEventListener('mouseup', this.onMouseUp);
     this.container.removeEventListener('contextmenu', this.onContextMenu);
+    this.container.removeEventListener('wheel', this.onWheel);
     window.removeEventListener('resize', this.onResize);
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);

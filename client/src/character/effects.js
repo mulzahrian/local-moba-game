@@ -98,7 +98,9 @@ export class Fx {
 
   setAlpha(alpha) {
     this.materials.forEach((m) => {
-      m.opacity = m.userData.base * alpha;
+      const value = m.userData.base * alpha;
+      if (m.userData.alphaUniform) m.userData.alphaUniform.value = value;
+      else m.opacity = value;
     });
   }
 
@@ -114,6 +116,83 @@ export function areaRadius(range, shape) {
   if (shape === 'circle') return Math.min(Math.max(range, 3), 20);
   if (shape === 'cone') return Math.min(Math.max(range * 0.6, 3), 9);
   return Math.min(Math.max(range * 0.25, 3), 6);
+}
+
+// Small solid accents give area effects a readable 3D silhouette from the isometric camera.
+// They are intentionally lightweight meshes instead of large particle clouds, so they remain
+// visible when the effect is viewed from the side as well as from above.
+export function orbitingOrbs(fx, radius, color, count = 6, height = 1.2) {
+  const material = fx.material(color, 0.9);
+  const orbs = Array.from({ length: count }, (_, i) => {
+    const orb = new THREE.Mesh(new THREE.IcosahedronGeometry(Math.max(0.08, radius * 0.045), 1), material);
+    orb.userData = { angle: (i / count) * TAU, phase: rand(0, TAU), lift: rand(0.65, 1.35) };
+    fx.add(orb);
+    return orb;
+  });
+  return (t, progress = 1) => {
+    orbs.forEach((orb, i) => {
+      const { angle, phase, lift } = orb.userData;
+      const a = angle + t * (1.2 + i * 0.08);
+      const r = radius * (0.45 + 0.42 * Math.sin(t * 2 + phase) ** 2) * progress;
+      orb.position.set(Math.cos(a) * r, height * lift + Math.sin(t * 3 + phase) * 0.25, Math.sin(a) * r);
+      orb.scale.setScalar(0.7 + 0.3 * Math.sin(t * 5 + phase) ** 2);
+    });
+  };
+}
+
+// A translucent animated shell gives an area effect volume. The moving vertex offset and
+// fresnel edge keep it readable from the side instead of looking like a flat decal.
+export function volumetricShell(fx, radius, color, height = 1) {
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uColor: { value: new THREE.Color(color) },
+      uOpacity: { value: 0.35 }
+    },
+    vertexShader: `
+      uniform float uTime;
+      varying vec3 vNormal;
+      varying vec3 vPosition;
+      void main() {
+        vNormal = normalize(normalMatrix * normal);
+        vec3 p = position;
+        float wave = sin(p.y * 5.0 + uTime * 4.0) * 0.045 + sin(p.x * 7.0 - uTime * 3.0) * 0.035;
+        p += normal * wave;
+        vPosition = p;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uColor;
+      uniform float uTime;
+      uniform float uOpacity;
+      varying vec3 vNormal;
+      varying vec3 vPosition;
+      void main() {
+        vec3 viewDir = normalize(cameraPosition - vPosition);
+        float fresnel = pow(1.0 - abs(dot(normalize(vNormal), viewDir)), 2.2);
+        float bands = 0.5 + 0.5 * sin(vPosition.y * 8.0 + uTime * 5.0 + vPosition.x * 4.0);
+        float alpha = (0.08 + fresnel * 0.62 + bands * 0.10) * uOpacity;
+        gl_FragColor = vec4(uColor * (0.85 + fresnel * 0.7), alpha);
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.DoubleSide
+  });
+  material.userData.base = 0.35;
+  material.userData.alphaUniform = material.uniforms.uOpacity;
+  fx.materials.push(material);
+
+  const shell = fx.add(new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), material));
+  shell.scale.set(radius, radius * height, radius);
+  shell.userData.animate = (t, progress = 1) => {
+    material.uniforms.uTime.value = t;
+    const breathe = 0.94 + Math.sin(t * 5.5) * 0.04;
+    shell.scale.set(radius * progress * breathe, radius * height * progress * breathe, radius * progress * breathe);
+  };
+  return shell;
 }
 
 const reach = (range) => Math.min(Math.max(range, 4), 40);
@@ -146,10 +225,16 @@ const BUILDERS = {
     }
 
     const sparks = fx.particles(40, 0xd9a8ff, 0.5);
+    const shell = volumetricShell(fx, R * 0.7, 0xa86bff, 0.42);
+    const orbs = orbitingOrbs(fx, R, 0xc28cff, 7, 0.7);
     const seeds = Array.from({ length: 40 }, () => ({ a: rand(0, TAU), r: rand(0.2, 0.95), s: rand(1.5, 3.5) }));
     fx.tick = (t) => {
-      fx.group.scale.setScalar(0.2 + 0.8 * easeOut(t / 0.35));
+      const open = easeOut(t / 0.35);
+      fx.group.scale.setScalar(0.2 + 0.8 * open);
       spinner.rotation.y = t * 1.6;
+      shell.userData.animate(t, open);
+      shell.position.y = R * 0.5;
+      orbs(t, open);
       seeds.forEach((s, i) => {
         sparks.set(i, Math.cos(s.a + t) * R * s.r, (t * s.s) % 5, Math.sin(s.a + t) * R * s.r);
       });
@@ -164,6 +249,8 @@ const BUILDERS = {
     const outer = fx.add(new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), fx.material(0xff6a1a, 0.55)));
     const inner = fx.add(new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12), fx.material(0xffd24a, 0.8)));
     const ground = fx.ring(0.9, 1, 0xff9a3a, 0.9);
+    const shell = volumetricShell(fx, R * 0.55, 0xff6a1a, 0.8);
+    const orbs = orbitingOrbs(fx, R, 0xffc04a, 8, 0.9);
     const sparks = fx.particles(60, 0xffa23a, 0.7);
     const seeds = Array.from({ length: 60 }, () => ({ a: rand(0, TAU), speed: rand(0.6, 1.6), lift: rand(0.4, 1.4) }));
     fx.tick = (t) => {
@@ -172,7 +259,10 @@ const BUILDERS = {
       outer.position.y = R * 0.3;
       inner.scale.setScalar(Math.max(0.01, R * 0.3 * easeOut(p * 2)));
       inner.position.y = R * 0.3;
+      shell.userData.animate(t, easeOut(p * 1.3));
+      shell.position.y = R * 0.3;
       ground.scale.setScalar(Math.max(0.01, R * easeOut(p * 1.6)));
+      orbs(t, easeOut(p * 1.2));
       seeds.forEach((s, i) => {
         const d = R * s.speed * easeOut(p * 1.3);
         sparks.set(i, Math.cos(s.a) * d, s.lift * R * 0.5 * Math.sin(Math.min(p * 1.4, 1) * Math.PI), Math.sin(s.a) * d);
@@ -198,11 +288,16 @@ const BUILDERS = {
       shards.push(shard);
     }
     const snow = fx.particles(50, 0xffffff, 0.45);
+    const shell = volumetricShell(fx, R * 0.7, 0x62c8ff, 0.3);
+    const orbs = orbitingOrbs(fx, R, 0x9fe8ff, 8, 0.6);
     const seeds = Array.from({ length: 50 }, () => ({ a: rand(0, TAU), r: rand(0.1, 1), s: rand(0.5, 1.5) }));
     fx.tick = (t) => {
       const p = clamp01(t / fx.duration);
       wave.scale.setScalar(Math.max(0.01, R * easeOut(p * 1.8)));
       frost.scale.setScalar(Math.max(0.01, R * easeOut(p * 1.8)));
+      shell.userData.animate(t, easeOut(p * 1.4));
+      shell.position.y = R * 0.35;
+      orbs(t, easeOut(p * 1.4));
       shards.forEach((s) => {
         const grow = easeOut((p - 0.1) * 3);
         const { a, length, dist } = s.userData;
@@ -329,6 +424,8 @@ const BUILDERS = {
     ));
     column.position.y = 3.5;
     const motes = fx.particles(50, 0xd8ffe4, 0.5);
+    const shell = volumetricShell(fx, R * 0.5, 0x69ff9a, 1.4);
+    const orbs = orbitingOrbs(fx, R, 0xb8ffd2, 6, 1.1);
     const seeds = Array.from({ length: 50 }, () => ({ a: rand(0, TAU), r: rand(0.2, 0.55), s: rand(1, 3) }));
     fx.tick = (t) => {
       pulses.forEach(({ delay, mesh }) => {
@@ -336,6 +433,9 @@ const BUILDERS = {
         mesh.visible = u > 0 && u < 1;
         mesh.scale.setScalar(Math.max(0.01, R * easeOut(u)));
       });
+      shell.userData.animate(t, easeOut(t / 0.55));
+      shell.position.y = 2.8;
+      orbs(t, easeOut(t / 0.55));
       seeds.forEach((s, i) => {
         motes.set(i, Math.cos(s.a + t * 2) * R * s.r, (t * s.s) % 6, Math.sin(s.a + t * 2) * R * s.r);
       });
@@ -357,12 +457,17 @@ const BUILDERS = {
       return mesh;
     });
     const dust = fx.particles(60, 0xeaf6ff, 0.5);
+    const shell = volumetricShell(fx, R * 0.48, 0x9fd8ff, 2.6);
+    const orbs = orbitingOrbs(fx, R, 0xd8f4ff, 7, 1.4);
     const seeds = Array.from({ length: 60 }, () => ({ a: rand(0, TAU), r: rand(0.3, 1), s: rand(0.8, 2) }));
     fx.tick = (t) => {
       layers.forEach((mesh, i) => {
         mesh.rotation.y = t * (3 + i * 0.7) * (i % 2 ? -1 : 1);
         mesh.scale.setScalar(0.3 + 0.7 * easeOut(t / 0.4));
       });
+      shell.userData.animate(t, easeOut(t / 0.4));
+      shell.position.y = R * 0.9;
+      orbs(t, easeOut(t / 0.4));
       seeds.forEach((s, i) => {
         const a = s.a + t * 4 * s.s;
         const y = (t * s.s * 3) % 8;

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Fx, TAU, clamp01, easeOut, rand, registerEffects } from '../character/effects.js';
+import { Fx, TAU, clamp01, easeOut, orbitingOrbs, rand, registerEffects } from '../character/effects.js';
 import { SUMMON_EFFECT_LABELS, SUMMON_SOUND_EFFECT } from './summonEffects.js';
 
 /**
@@ -139,6 +139,7 @@ const SKILL_BUILDERS = {
       }
     }
     const glow = fx.particles(30, 0xb59cff, 0.5);
+    const orbs = orbitingOrbs(fx, R, 0xe0d8ff, 6, 0.9);
     const seeds = Array.from({ length: 30 }, () => ({ a: rand(0, TAU), r: rand(0.2, 1) }));
     fx.tick = (t) => {
       const close = easeOut(t / 0.55);
@@ -148,6 +149,7 @@ const SKILL_BUILDERS = {
         const ang = a + close * 1.2;
         link.position.set(Math.cos(ang) * dist, 0.3 + k * 1.6 * close, Math.sin(ang) * dist);
       });
+      orbs(t, close);
       seeds.forEach((s, i) => {
         const spread = R * s.r * (1 - close * 0.7);
         glow.set(i, Math.cos(s.a + t * 2) * spread, 0.5 + ((t * 2) % 2), Math.sin(s.a + t * 2) * spread);
@@ -176,6 +178,7 @@ const SKILL_BUILDERS = {
       return { delay, mesh };
     });
     const ground = fx.ring(0.85, 1, 0xff9be8, 0.8);
+    const orbs = orbitingOrbs(fx, R, 0xff9be8, 8, 1.8);
     fx.tick = (t) => {
       ground.scale.setScalar(Math.max(0.01, R * easeOut(t / 0.9)));
       waves.forEach(({ delay, mesh }) => {
@@ -184,6 +187,7 @@ const SKILL_BUILDERS = {
         mesh.scale.setScalar(Math.max(0.01, R * 0.7 * easeOut(u)));
         mesh.rotation.y = t * 1.5;
       });
+      orbs(t, easeOut(t / 0.45));
     };
     return fx;
   },
