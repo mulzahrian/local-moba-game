@@ -28,9 +28,14 @@ export class Fx {
   }
 
   material(color, opacity = 0.9, additive = true) {
+    const tint = new THREE.Color(color);
     return this.track(
-      new THREE.MeshBasicMaterial({
-        color,
+      new THREE.MeshStandardMaterial({
+        color: tint,
+        emissive: tint,
+        emissiveIntensity: additive ? 1.35 : 0.18,
+        roughness: additive ? 0.32 : 0.58,
+        metalness: additive ? 0.18 : 0.04,
         transparent: true,
         opacity,
         blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
@@ -59,9 +64,14 @@ export class Fx {
     return object;
   }
 
-  // Flat ring lying on the ground.
+  // Beveled ring lying on the ground.
   ring(inner, outer, color, opacity = 0.9, y = 0.06) {
-    const mesh = this.add(new THREE.Mesh(new THREE.RingGeometry(inner, outer, 48), this.material(color, opacity)));
+    // Use a beveled torus for outlines. Full discs still use CircleGeometry, but ordinary
+    // rings now have real thickness and catch scene light from the side.
+    const geometry = inner <= 0.001
+      ? new THREE.CircleGeometry(outer, 48)
+      : new THREE.TorusGeometry((inner + outer) / 2, (outer - inner) / 2, 10, 48);
+    const mesh = this.add(new THREE.Mesh(geometry, this.material(color, opacity)));
     mesh.rotation.x = -Math.PI / 2;
     mesh.position.y = y;
     return mesh;
@@ -549,22 +559,32 @@ const BUILDERS = {
   meteorFall({ range, shape }) {
     const R = areaRadius(range, shape);
     const fx = new Fx(2.0);
-    const bodyMaterial = fx.material(0xff7a2a, 0.95);
-    const tailMaterial = fx.material(0xffc060, 0.6);
-    const blastMaterial = fx.material(0xffb04a, 0.8);
+    const bodyMaterial = fx.material(0x6d3022, 0.98, false);
+    const hotMaterial = fx.material(0xffe08a, 0.92);
+    const tailMaterial = fx.material(0xff7a2a, 0.45);
+    const blastMaterial = fx.material(0xffb04a, 0.65);
     const meteors = Array.from({ length: 7 }, (_, i) => {
       const a = rand(0, TAU);
       const d = i === 0 ? 0 : rand(0.2, 0.9) * R;
       const size = Math.max(0.5, R * 0.07);
-      const body = new THREE.Mesh(new THREE.SphereGeometry(size, 12, 8), bodyMaterial);
-      const tail = new THREE.Mesh(new THREE.ConeGeometry(size, 5, 10, 1, true), tailMaterial);
-      tail.position.y = 3;
+      const body = new THREE.Mesh(new THREE.DodecahedronGeometry(size, 1), bodyMaterial);
+      const hotCore = new THREE.Mesh(new THREE.IcosahedronGeometry(size * 0.55, 1), hotMaterial);
+      hotCore.position.set(0, -size * 0.25, 0);
+      body.add(hotCore);
+      const tail = new THREE.Group();
+      for (let k = 0; k < 3; k++) {
+        const plume = new THREE.Mesh(new THREE.ConeGeometry(size * (0.35 - k * 0.07), 3.2 + k * 1.3, 7, 1, true), tailMaterial);
+        plume.position.set((k - 1) * size * 0.35, 2.4 + k * 0.5, 0);
+        plume.rotation.z = (k - 1) * 0.12;
+        tail.add(plume);
+      }
       body.add(tail);
       const blast = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), blastMaterial);
       fx.add(body);
       fx.add(blast);
       const marker = fx.ring(0.3, 0.45, 0xff5a2a, 0.7);
-      return { x: Math.cos(a) * d, z: Math.sin(a) * d, delay: 0.1 + i * 0.18, body, blast, marker };
+      const impact = fx.ring(0.45, 0.62, 0xffdf8a, 0.9);
+      return { x: Math.cos(a) * d, z: Math.sin(a) * d, delay: 0.1 + i * 0.18, body, blast, marker, impact, spin: rand(-2, 2) };
     });
     const FALL = 0.5;
     fx.tick = (t) => {
@@ -576,11 +596,14 @@ const BUILDERS = {
         m.marker.visible = started && u < 1;
         m.body.visible = started && u < 1;
         m.body.position.set(m.x - (1 - u) * 8, 24 * (1 - u * u) + 0.5, m.z);
-        m.body.rotation.z = 0.3;
+        m.body.rotation.set(t * m.spin, t * 2.5, 0.3);
         const b = clamp01((t - m.delay - FALL) / 0.45);
         m.blast.visible = b > 0 && b < 1;
         m.blast.position.set(m.x, 0.8, m.z);
         m.blast.scale.setScalar(Math.max(0.01, R * 0.22 * easeOut(b) + 0.1));
+        m.impact.visible = b > 0 && b < 1;
+        m.impact.position.set(m.x, 0.08, m.z);
+        m.impact.scale.setScalar(Math.max(0.01, R * 0.25 * easeOut(b * 1.3)));
       });
     };
     return fx;
