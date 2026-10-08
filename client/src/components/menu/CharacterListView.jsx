@@ -4,6 +4,7 @@ import { invalidateCharacter } from '../../character/characterAssets.js';
 import { useT } from '../../i18n/index.js';
 import { CharacterAvatar } from '../character/CharacterAvatar.jsx';
 import '../../styles/Character.css';
+import characterSelectBackground from '../../public/img/char-select.png';
 
 export function CharacterListView({ onBack, onEdit }) {
   const t = useT();
@@ -40,7 +41,10 @@ export function CharacterListView({ onBack, onEdit }) {
   };
 
   return (
-    <div className="menu-panel wide">
+    <div
+      className="menu-panel wide character-select-panel"
+      style={{ backgroundImage: `linear-gradient(rgba(10, 6, 3, 0.5), rgba(10, 6, 3, 0.88)), url(${characterSelectBackground})` }}
+    >
       <h2 className="panel-title">{t('chars.title')}</h2>
 
       <div className="map-pick-list">

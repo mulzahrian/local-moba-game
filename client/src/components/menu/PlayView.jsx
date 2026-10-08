@@ -2,6 +2,7 @@ import React from 'react';
 import { useT } from '../../i18n/index.js';
 import { useSettingsStore } from '../../store/settingsStore.js';
 import { CharacterPicker } from '../character/CharacterPicker.jsx';
+import characterSelectBackground from '../../public/img/char-select.png';
 
 export function PlayView({ onNavigate }) {
   const t = useT();
@@ -12,7 +13,10 @@ export function PlayView({ onNavigate }) {
   const ready = playerName.trim().length > 0 && characterId !== '';
 
   return (
-    <div className="menu-panel">
+    <div
+      className="menu-panel character-select-panel"
+      style={{ backgroundImage: `linear-gradient(rgba(10, 6, 3, 0.46), rgba(10, 6, 3, 0.82)), url(${characterSelectBackground})` }}
+    >
       <h2 className="panel-title">{t('play.title')}</h2>
 
       <label className="field-label" htmlFor="hero-name">{t('play.playerName')}</label>

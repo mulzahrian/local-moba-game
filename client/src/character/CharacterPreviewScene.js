@@ -5,6 +5,7 @@ import { EffectManager } from './effects.js';
 import { attackEffectId } from './attackEffects.js';
 import { getAttackType } from '../../../shared/characterConfig.js';
 import { playActionSound, playPowerSound, playReactionSound } from './characterSounds.js';
+import characterSelectBackground from '../public/img/char-select.png';
 
 const PREVIEW_EFFECT_RANGE = 9; // real skill ranges are too large to frame in the small preview
 
@@ -13,7 +14,9 @@ export class CharacterPreviewScene {
   constructor(container) {
     this.container = container;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x120d08);
+    this.backgroundTexture = new THREE.TextureLoader().load(characterSelectBackground);
+    this.backgroundTexture.colorSpace = THREE.SRGBColorSpace;
+    this.scene.background = this.backgroundTexture;
     this.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 300);
     this.camera.position.set(0, 4.5, 13);
 
@@ -140,6 +143,7 @@ export class CharacterPreviewScene {
     cancelAnimationFrame(this.frameId);
     this.resizeObserver.disconnect();
     this.effects.dispose();
+    this.backgroundTexture.dispose();
     this.actor?.dispose();
     this.controls.dispose();
     this.renderer.dispose();

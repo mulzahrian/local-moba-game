@@ -22,6 +22,25 @@
 }
 
 .char-picker { text-align: left; }
+.character-art-bg {
+  background-image: linear-gradient(rgba(10, 6, 3, 0.38), rgba(10, 6, 3, 0.88)), url('../public/img/char-select.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+.character-select-panel {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.55), 0 14px 40px rgba(0, 0, 0, 0.35);
+}
+
+.character-select-panel .char-stage,
+.character-select-panel .char-row,
+.character-select-panel .role-skills {
+  background-color: rgba(10, 6, 3, 0.66);
+}
 .char-picker-label { margin-top: 18px; }
 
 .char-picker-body {

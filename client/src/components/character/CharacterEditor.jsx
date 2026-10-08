@@ -286,7 +286,7 @@ export function CharacterEditor({ characterId, onExit }) {
 
   if (step === 'setup') {
     return (
-      <div className="editor-root">
+      <div className="editor-root character-art-bg">
         {topbar}
         <div className="ce-setup-wrap">
           <div className="ce-setup">
@@ -357,7 +357,7 @@ export function CharacterEditor({ characterId, onExit }) {
   const config = getRoleConfig(role);
 
   return (
-    <div className="editor-root">
+    <div className="editor-root character-art-bg">
       {topbar}
       <div className="editor-body">
         <aside className="editor-panel left ce-anim-panel">
