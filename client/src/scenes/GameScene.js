@@ -29,6 +29,9 @@ const MOVE_SPEED = 45 * UNIT_SCALE; // units per second
 const CAMERA_FOV = 60;
 const CAMERA_OFFSET = new THREE.Vector3(23, 35, 35); // follow-camera offset from the focus point
 const CAMERA_FOLLOW_SMOOTHING = 8; // higher = camera catches up faster
+const CAMERA_ROTATE_SENSITIVITY = 0.008;
+const CAMERA_MIN_PITCH = THREE.MathUtils.degToRad(25);
+const CAMERA_MAX_PITCH = THREE.MathUtils.degToRad(78);
 const DEFAULT_ARENA_SIZE = 500;
 const NETWORK_SYNC_INTERVAL = 0.05; // seconds between position broadcasts (20Hz)
 const MOVE_EPSILON_SQ = 0.0005; // squared distance threshold to consider a remote player "moving"
@@ -101,6 +104,13 @@ export class GameScene {
     this.networkSyncTimer = 0;
     this.cameraFocus = new THREE.Vector3();
     this.cameraSnapPending = true;
+    this.cameraDistance = CAMERA_OFFSET.length();
+    this.cameraYaw = Math.atan2(CAMERA_OFFSET.x, CAMERA_OFFSET.z);
+    this.cameraPitch = Math.atan2(
+      CAMERA_OFFSET.y,
+      Math.hypot(CAMERA_OFFSET.x, CAMERA_OFFSET.z)
+    );
+    this.cameraDragging = false;
 
     this.setupEventListeners();
     this.setupKeyboardControls();
@@ -156,7 +166,11 @@ export class GameScene {
     this.camera.lookAt(0, 0, 0);
 
     // Precompute camera-relative movement axes (flattened to the ground plane)
-    // so WASD moves the character relative to this fixed isometric view.
+    // so WASD moves the character relative to the current camera view.
+    this.updateCameraMovementAxes();
+  }
+
+  updateCameraMovementAxes() {
     this.cameraForward = new THREE.Vector3();
     this.camera.getWorldDirection(this.cameraForward);
     this.cameraForward.y = 0;
@@ -1172,13 +1186,43 @@ export class GameScene {
 
   setupEventListeners() {
     this.onMouseDown = (e) => {
+      if (e.button === 2) {
+        e.preventDefault();
+        this.cameraDragging = true;
+        this.cameraDragX = e.clientX;
+        this.cameraDragY = e.clientY;
+        this.renderer.domElement.style.cursor = 'grabbing';
+        return;
+      }
       if (e.button !== 0) return;
       this.updateMouse(e);
       this.performAction('attack');
     };
-    this.onMove = (e) => this.updateMouse(e);
+    this.onMove = (e) => {
+      this.updateMouse(e);
+      if (!this.cameraDragging) return;
+
+      const dx = e.clientX - this.cameraDragX;
+      const dy = e.clientY - this.cameraDragY;
+      this.cameraDragX = e.clientX;
+      this.cameraDragY = e.clientY;
+      this.cameraYaw -= dx * CAMERA_ROTATE_SENSITIVITY;
+      this.cameraPitch = THREE.MathUtils.clamp(
+        this.cameraPitch + dy * CAMERA_ROTATE_SENSITIVITY,
+        CAMERA_MIN_PITCH,
+        CAMERA_MAX_PITCH
+      );
+    };
+    this.onMouseUp = (e) => {
+      if (e.button !== 2) return;
+      this.cameraDragging = false;
+      this.renderer.domElement.style.cursor = '';
+    };
+    this.onContextMenu = (e) => e.preventDefault();
     this.container.addEventListener('mousedown', this.onMouseDown);
     this.container.addEventListener('mousemove', this.onMove);
+    window.addEventListener('mouseup', this.onMouseUp);
+    this.container.addEventListener('contextmenu', this.onContextMenu);
   }
 
   updateMouse(event) {
@@ -1209,8 +1253,15 @@ export class GameScene {
       this.cameraFocus.lerp(target, 1 - Math.exp(-CAMERA_FOLLOW_SMOOTHING * delta));
     }
 
-    this.camera.position.copy(this.cameraFocus).add(CAMERA_OFFSET);
+    const horizontalDistance = this.cameraDistance * Math.cos(this.cameraPitch);
+    const cameraOffset = new THREE.Vector3(
+      Math.sin(this.cameraYaw) * horizontalDistance,
+      this.cameraDistance * Math.sin(this.cameraPitch),
+      Math.cos(this.cameraYaw) * horizontalDistance
+    );
+    this.camera.position.copy(this.cameraFocus).add(cameraOffset);
     this.camera.lookAt(this.cameraFocus);
+    this.updateCameraMovementAxes();
 
     this.sunLight.position.copy(this.cameraFocus).add(new THREE.Vector3(50, 100, 50));
     this.sunLight.target.position.copy(this.cameraFocus);
@@ -1251,6 +1302,8 @@ export class GameScene {
     this.environment.dispose();
     this.container.removeEventListener('mousedown', this.onMouseDown);
     this.container.removeEventListener('mousemove', this.onMove);
+    window.removeEventListener('mouseup', this.onMouseUp);
+    this.container.removeEventListener('contextmenu', this.onContextMenu);
     window.removeEventListener('resize', this.onResize);
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
