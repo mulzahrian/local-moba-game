@@ -7,6 +7,7 @@ import {
   DEFAULT_GENDER,
   DEFAULT_ROLE,
   EFFECT_IDS,
+  EFFECT_GROUPS,
   GENDERS,
   ROLES,
   SKILL_SLOTS,
@@ -402,8 +403,12 @@ export function CharacterEditor({ characterId, onExit }) {
                       {config.skills[slot].name[language] || config.skills[slot].name.en} • {t('char.effect')}
                     </span>
                     <select value={effects[slot]} onChange={(e) => changeEffect(slot, e.target.value)}>
-                      {EFFECT_IDS.map((id) => (
-                        <option key={id} value={id}>{effectLabel(id, language)}</option>
+                      {EFFECT_GROUPS.map((group) => (
+                        <optgroup key={group.id} label={group.label[language] || group.label.en}>
+                          {group.ids.map((id) => (
+                            <option key={id} value={id}>{effectLabel(id, language)}</option>
+                          ))}
+                        </optgroup>
                       ))}
                     </select>
                   </div>
@@ -421,14 +426,19 @@ export function CharacterEditor({ characterId, onExit }) {
         <aside className="editor-panel right">
           <h3>{t('char.effect')}</h3>
           <div className="ce-gallery">
-            {EFFECT_IDS.filter((id) => id !== 'none').map((id) => (
-              <button
-                key={id}
-                className="ed-item"
-                onClick={() => previewRef.current?.playEffect(id, { range: 9, shape: 'circle' })}
-              >
-                ✦ {effectLabel(id, language)}
-              </button>
+            {EFFECT_GROUPS.map((group) => (
+              <div key={group.id} className="ce-effect-group">
+                <div className="ce-effect-group-title">{group.label[language] || group.label.en}</div>
+                {group.ids.filter((id) => id !== 'none').map((id) => (
+                  <button
+                    key={id}
+                    className="ed-item"
+                    onClick={() => previewRef.current?.playEffect(id, { range: 9, shape: 'circle' })}
+                  >
+                    ✦ {effectLabel(id, language)}
+                  </button>
+                ))}
+              </div>
             ))}
           </div>
 

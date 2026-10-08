@@ -103,7 +103,24 @@ export const EFFECT_IDS = [
   'elementThunderField',
   'elementChainLightning',
   'elementVoltNova',
-  'elementElectricCage'
+  'elementElectricCage',
+  // original MOBA-inspired effects for review
+  'mobaAstralBlade',
+  'mobaInfernoComet',
+  'mobaFrostPrison',
+  'mobaStormLance',
+  'mobaVoidBloom'
+];
+
+// UI grouping for the growing effect library. The server still validates the flat EFFECT_IDS list.
+export const EFFECT_GROUPS = [
+  { id: 'core', label: { en: 'Core Effects', id: 'Efek Utama' }, ids: EFFECT_IDS.slice(0, 31) },
+  { id: 'fire', label: { en: 'Fire', id: 'Api' }, ids: ['elementFireBurst', 'elementFireSpiral', 'elementEmberRain', 'elementMagmaRing', 'elementSolarFlare'] },
+  { id: 'wind', label: { en: 'Wind', id: 'Angin' }, ids: ['elementWindBlade', 'elementCycloneBurst', 'elementAirCutter', 'elementStormEye', 'elementFeatherGale'] },
+  { id: 'earth', label: { en: 'Earth', id: 'Tanah' }, ids: ['elementStoneBurst', 'elementTectonicRing', 'elementCrystalWall', 'elementBoulderField', 'elementQuakePulse'] },
+  { id: 'water', label: { en: 'Water', id: 'Air' }, ids: ['elementWaterWhirlpool', 'elementAquaLance', 'elementTidalBurst', 'elementBubblePrison', 'elementRainCrescent'] },
+  { id: 'electric', label: { en: 'Electric', id: 'Listrik' }, ids: ['elementSparkBurst', 'elementThunderField', 'elementChainLightning', 'elementVoltNova', 'elementElectricCage'] },
+  { id: 'moba-inspired', label: { en: 'MOBA-inspired', id: 'Terinspirasi MOBA' }, ids: ['mobaAstralBlade', 'mobaInfernoComet', 'mobaFrostPrison', 'mobaStormLance', 'mobaVoidBloom'] }
 ];
 
 export const MAX_ANIMATION_NAME = 120;

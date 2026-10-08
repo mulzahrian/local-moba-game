@@ -93,6 +93,11 @@ const ELEMENTAL_SOUNDS = {
   elementChainLightning: [lightningPower, windPower, hitSfx],
   elementVoltNova: [lightningPower, fireBurstPower, shockwavePower],
   elementElectricCage: [lightningPower, magicCirclePower, knockSfx]
+  ,mobaAstralBlade: [slashPower, slashSfx, magicCirclePower]
+  ,mobaInfernoComet: [meteorPower, fireBurstPower, shockwavePower]
+  ,mobaFrostPrison: [iceNovaPower, magicCirclePower, healingPower]
+  ,mobaStormLance: [lightningPower, windPower, arrowPower]
+  ,mobaVoidBloom: [shadowVanishPower, magicCirclePower, windPower]
 };
 
 export const RUN_SOUND = runSfx;
