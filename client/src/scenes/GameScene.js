@@ -26,6 +26,8 @@ import { translate } from '../i18n/index.js';
 
 const UNIT_SCALE = 0.25; // characters are drawn at 0.25x relative to the map; scales character-attached helpers
 const MOVE_SPEED = 45 * UNIT_SCALE; // units per second
+const MOVE_ACCELERATION = 18; // smooths start/stop without making the character feel sluggish
+const MOVE_DECELERATION = 26;
 const CAMERA_FOV = 60;
 const CAMERA_OFFSET = new THREE.Vector3(23, 35, 35); // follow-camera offset from the focus point
 const CAMERA_FOLLOW_SMOOTHING = 8; // higher = camera catches up faster
@@ -111,6 +113,8 @@ export class GameScene {
       Math.hypot(CAMERA_OFFSET.x, CAMERA_OFFSET.z)
     );
     this.cameraDragging = false;
+    this.aimTarget = null;
+    this.cameraShake = 0;
 
     this.setupEventListeners();
     this.setupKeyboardControls();
@@ -164,6 +168,22 @@ export class GameScene {
     // MOBA-style fixed-angle camera; updateCamera() keeps it centred on the local player.
     this.camera.position.copy(CAMERA_OFFSET);
     this.camera.lookAt(0, 0, 0);
+
+    this.targetMarker = new THREE.Mesh(
+      new THREE.RingGeometry(1.8, 2.15, 32),
+      new THREE.MeshBasicMaterial({
+        color: 0xff6b6b,
+        transparent: true,
+        opacity: 0.9,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      })
+    );
+    this.targetMarker.rotation.x = -Math.PI / 2;
+    this.targetMarker.position.y = 0.08;
+    this.targetMarker.visible = false;
+    this.targetMarker.renderOrder = 5;
+    this.scene.add(this.targetMarker);
 
     // Precompute camera-relative movement axes (flattened to the ground plane)
     // so WASD moves the character relative to the current camera view.
@@ -713,7 +733,9 @@ export class GameScene {
       cooldownTotals: {},
       nextAttack: 'attack1',
       lastAttackAt: 0,
-      sendLockUntil: 0
+      sendLockUntil: 0,
+      queuedAttack: false,
+      moveVelocity: new THREE.Vector3()
     });
   }
 
@@ -823,12 +845,14 @@ export class GameScene {
     if (!player) return;
 
     if (player.dead || this.gameOver || player.displacement) {
+      player.moveVelocity.set(0, 0, 0);
       this.setPlayerMoving(player, false);
       return;
     }
 
     // Mind controlled: the player is walked towards whoever controls it and cannot steer.
     if (performance.now() < (player.dominatedUntil || 0)) {
+      player.moveVelocity.set(0, 0, 0);
       const master = this.players.get(player.dominatorId)?.mesh.position;
       const toMaster = master ? new THREE.Vector3(master.x - player.mesh.position.x, 0, master.z - player.mesh.position.z) : null;
       if (toMaster && toMaster.length() > DOMINATED_STOP_DISTANCE) {
@@ -840,29 +864,55 @@ export class GameScene {
     }
 
     if (this.isStunned(player)) {
+      player.moveVelocity.set(0, 0, 0);
       this.setPlayerMoving(player, false);
       return;
     }
 
     const { w, a, s, d } = this.keys;
-    if (!w && !a && !s && !d) {
-      this.setPlayerMoving(player, false);
-      this.flushLocalPosition(player);
-      return;
-    }
-
     const moveDir = new THREE.Vector3();
     if (w) moveDir.add(this.cameraForward);
     if (s) moveDir.sub(this.cameraForward);
     if (d) moveDir.add(this.cameraRight);
     if (a) moveDir.sub(this.cameraRight);
 
-    if (moveDir.lengthSq() === 0) {
+    if (moveDir.lengthSq() > 0) {
+      moveDir.normalize();
+      const desiredVelocity = moveDir.multiplyScalar(MOVE_SPEED);
+      const blend = 1 - Math.exp(-MOVE_ACCELERATION * delta);
+      player.moveVelocity.lerp(desiredVelocity, blend);
+    } else {
+      const blend = 1 - Math.exp(-MOVE_DECELERATION * delta);
+      player.moveVelocity.lerp(new THREE.Vector3(), blend);
+    }
+
+    if (player.moveVelocity.lengthSq() < 0.0004) {
+      player.moveVelocity.set(0, 0, 0);
       this.setPlayerMoving(player, false);
       this.flushLocalPosition(player);
       return;
     }
-    this.stepLocal(player, moveDir.normalize(), delta);
+
+    this.stepLocalVelocity(player, player.moveVelocity, delta);
+  }
+
+  // Applies a smoothed velocity while keeping collision, facing and network sync in one place.
+  stepLocalVelocity(player, velocity, delta) {
+    const distance = velocity.length() * delta;
+    const direction = velocity.clone().normalize();
+    const wantedX = THREE.MathUtils.clamp(player.mesh.position.x + direction.x * distance, -this.arenaLimit, this.arenaLimit);
+    const wantedZ = THREE.MathUtils.clamp(player.mesh.position.z + direction.z * distance, -this.arenaLimit, this.arenaLimit);
+    const { x: nextX, z: nextZ } = this.collide(wantedX, wantedZ);
+
+    player.mesh.position.set(nextX, 0, nextZ);
+    player.model.rotation.y = Math.atan2(direction.x, direction.z);
+    this.setPlayerMoving(player, true);
+
+    this.networkSyncTimer += delta;
+    if (this.networkSyncTimer >= NETWORK_SYNC_INTERVAL) {
+      this.networkSyncTimer = 0;
+      this.emitPosition(nextX, nextZ);
+    }
   }
 
   // Moves the local player along `moveDir` (a unit vector), faces it that way and syncs the position.
@@ -895,6 +945,13 @@ export class GameScene {
 
   // Direction (on the ground plane) from the local player towards the mouse cursor.
   getAimDirection(player) {
+    if (this.aimTarget && !this.aimTarget.dead && this.aimTarget.mesh.visible) {
+      const dx = this.aimTarget.mesh.position.x - player.mesh.position.x;
+      const dz = this.aimTarget.mesh.position.z - player.mesh.position.z;
+      const length = Math.hypot(dx, dz);
+      if (length > 0.5) return { x: dx / length, z: dz / length };
+    }
+
     this.raycaster.setFromCamera(this.mouse, this.camera);
     const point = new THREE.Vector3();
     if (this.raycaster.ray.intersectPlane(this.groundPlane, point)) {
@@ -915,7 +972,15 @@ export class GameScene {
   performAction(request) {
     const me = this.getCurrentPlayerEntry();
     const now = performance.now();
-    if (!me || me.dead || this.gameOver || this.isStunned(me) || me.displacement || now < me.sendLockUntil) return;
+    if (!me || me.dead || this.gameOver || this.isStunned(me) || me.displacement) return;
+
+    // Keep one basic attack input buffered. This makes click-spamming feel responsive
+    // without bypassing the server-side cooldown or sending a burst of requests.
+    if (request === 'attack' && now < me.sendLockUntil) {
+      me.queuedAttack = true;
+      return;
+    }
+    if (now < me.sendLockUntil) return;
 
     let slot = request;
     if (request === 'attack') {
@@ -925,13 +990,18 @@ export class GameScene {
 
     const custom = isSkillSlot(slot);
     const def = custom ? getSkillAction(skillIdOfSlot(slot)) : getActionDef(me.role, slot);
-    if (!def || (me.cooldownEnds[slot] || 0) > now) return;
+    if (!def) return;
+    if ((me.cooldownEnds[slot] || 0) > now) {
+      if (request === 'attack') me.queuedAttack = true;
+      return;
+    }
 
     const networked = Boolean(this.socketService && this.roomCode);
     const cost = custom ? def.manaCost : getManaCost(me.role, slot);
     if (networked && (me.data.mana ?? Infinity) < cost) return;
 
     me.sendLockUntil = now + SEND_LOCK_MS;
+    if (request === 'attack') me.queuedAttack = false;
     const dir = this.getAimDirection(me);
 
     if (networked) {
@@ -953,6 +1023,12 @@ export class GameScene {
       };
     }
     this.handleSkillUsed(event);
+  }
+
+  processQueuedActions() {
+    const player = this.getCurrentPlayerEntry();
+    if (!player || !player.queuedAttack) return;
+    if (performance.now() >= player.sendLockUntil) this.performAction('attack');
   }
 
   // Server broadcast: someone attacked / cast a skill / emoted.
@@ -1035,6 +1111,7 @@ export class GameScene {
 
     target.data = { ...target.data, health: hit.health };
     if (hit.damage > 0) this.spawnFloater(target.mesh.position, `-${hit.damage}`, '#ff6b6b');
+    if (target.isCurrentPlayer) this.cameraShake = Math.min(0.45, this.cameraShake + (hit.damage > 0 ? 0.16 : 0.08));
 
     if (!target.actor.play(hit.reaction)) target.actor.play('hit');
     playReactionSound(target.def, hit.reaction === 'stunned' ? 'hit' : hit.reaction, this.soundVolume(target.mesh.position));
@@ -1229,6 +1306,31 @@ export class GameScene {
     const rect = this.container.getBoundingClientRect();
     this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    this.updateAimTarget();
+  }
+
+  updateAimTarget() {
+    const me = this.getCurrentPlayerEntry();
+    if (!me || !this.raycaster) return;
+
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const candidates = [...this.players.values()].filter((player) =>
+      player !== me &&
+      !player.dead &&
+      player.mesh.visible &&
+      player.data.team !== me.data.team
+    );
+    const hits = this.raycaster.intersectObjects(candidates.map((player) => player.model), true);
+    let target = null;
+    for (const hit of hits) {
+      let node = hit.object;
+      while (node && !node.userData.playerId) node = node.parent;
+      target = node ? this.players.get(node.userData.playerId) : null;
+      if (target && candidates.includes(target)) break;
+      target = null;
+    }
+    this.aimTarget = target;
+    this.targetMarker.visible = Boolean(target);
   }
 
   onWindowResize() {
@@ -1260,6 +1362,13 @@ export class GameScene {
       Math.cos(this.cameraYaw) * horizontalDistance
     );
     this.camera.position.copy(this.cameraFocus).add(cameraOffset);
+    const shake = this.cameraShake;
+    this.cameraShake *= Math.exp(-14 * delta);
+    if (shake > 0.001) {
+      this.camera.position.x += (Math.random() - 0.5) * shake;
+      this.camera.position.y += (Math.random() - 0.5) * shake * 0.6;
+      this.camera.position.z += (Math.random() - 0.5) * shake;
+    }
     this.camera.lookAt(this.cameraFocus);
     this.updateCameraMovementAxes();
 
@@ -1272,6 +1381,7 @@ export class GameScene {
 
     const delta = this.clock.getDelta();
     this.updateLocalMovement(delta);
+    this.processQueuedActions();
     this.updateDisplacements(delta);
     this.updateRemotePlayers(delta);
     this.mapObjects.forEach((object) => object.update(delta));
@@ -1291,6 +1401,15 @@ export class GameScene {
     this.updateFloaters(delta);
 
     this.updateCamera(delta);
+    if (this.aimTarget && (!this.aimTarget.mesh.visible || this.aimTarget.dead)) {
+      this.aimTarget = null;
+      this.targetMarker.visible = false;
+    }
+    if (this.aimTarget) {
+      const pulse = 1 + Math.sin(performance.now() * 0.008) * 0.08;
+      this.targetMarker.position.set(this.aimTarget.mesh.position.x, 0.08, this.aimTarget.mesh.position.z);
+      this.targetMarker.scale.setScalar(pulse);
+    }
     this.environment.update(delta, this.cameraFocus);
     this.renderer.render(this.scene, this.camera);
   };
@@ -1308,6 +1427,9 @@ export class GameScene {
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
     this.effects.dispose();
+    this.scene.remove(this.targetMarker);
+    this.targetMarker.geometry.dispose();
+    this.targetMarker.material.dispose();
     while (this.floaters.length) this.removeFloater(this.floaters.length - 1);
     this.players.forEach((player) => player.actor.dispose());
     this.clearWorld();
