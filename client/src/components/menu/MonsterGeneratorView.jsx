@@ -12,6 +12,7 @@ import { monsterApi } from '../../monster/monsterApi.js';
 import { skillApi } from '../../skill/skillApi.js';
 import { ActorSetup } from './ActorSetup.jsx';
 import { MapTabs } from './MapTabs.jsx';
+import monsterLogoUrl from '../../public/assets/logo/monster-logo.png';
 import '../../styles/ObjectLibrary.css';
 import '../../styles/Skills.css';
 
@@ -132,7 +133,7 @@ export function MonsterGeneratorView({ onBack, onNavigate }) {
               className={`map-card row ol-group ${selectedId === monster.id ? 'selected' : ''}`}
               onClick={() => open(monster.id)}
             >
-              <span className="skill-icon skill-icon-glyph" style={{ width: 40, height: 40, fontSize: 22 }}>👹</span>
+              <img className="monster-logo-icon" src={monsterLogoUrl} alt="" />
               <div className="map-card-info">
                 <span className="map-card-name">{monster.name}</span>
                 <span className="map-card-meta">
