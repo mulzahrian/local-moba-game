@@ -5,6 +5,7 @@ import { objectApi } from './objectApi.js';
 import { monsterApi } from '../monster/monsterApi.js';
 import { FLIGHT_HEIGHT, monsterObjectType } from '../../../shared/monsterConfig.js';
 import { CHARACTER_HEIGHT } from '../character/characterAssets.js';
+import monsterLogoUrl from '../public/assets/logo/monster-logo.png';
 
 const DEFAULT_FIT_SIZE = 10;
 
@@ -52,7 +53,7 @@ function applyLibrary(groups, monsters = []) {
 
   const placeable = monsters.filter((monster) => monster.hasModel);
   if (placeable.length) {
-    customCategories.push({ id: MONSTER_CATEGORY, custom: true, logoUrl: null, name: { en: 'Monsters', id: 'Monster' } });
+    customCategories.push({ id: MONSTER_CATEGORY, custom: true, logoUrl: monsterLogoUrl, name: { en: 'Monsters', id: 'Monster' } });
     placeable.forEach((monster) => {
       const id = monsterObjectType(monster.id);
       customDefinitions.set(id, {
