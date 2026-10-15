@@ -7,6 +7,8 @@ export function SettingsView({ onBack }) {
   const t = useT();
   const musicOn = useSettingsStore((s) => s.musicOn);
   const setMusicOn = useSettingsStore((s) => s.setMusicOn);
+  const sfxOn = useSettingsStore((s) => s.sfxOn);
+  const setSfxOn = useSettingsStore((s) => s.setSfxOn);
   const language = useSettingsStore((s) => s.language);
   const setLanguage = useSettingsStore((s) => s.setLanguage);
 
@@ -21,6 +23,18 @@ export function SettingsView({ onBack }) {
             {t('common.on')}
           </button>
           <button className={`toggle-btn ${!musicOn ? 'active' : ''}`} onClick={() => setMusicOn(false)}>
+            {t('common.off')}
+          </button>
+        </div>
+      </div>
+
+      <div className="setting-row">
+        <span className="setting-label">{t('settings.sfx')}</span>
+        <div className="toggle-group">
+          <button className={`toggle-btn ${sfxOn ? 'active' : ''}`} onClick={() => setSfxOn(true)}>
+            {t('common.on')}
+          </button>
+          <button className={`toggle-btn ${!sfxOn ? 'active' : ''}`} onClick={() => setSfxOn(false)}>
             {t('common.off')}
           </button>
         </div>

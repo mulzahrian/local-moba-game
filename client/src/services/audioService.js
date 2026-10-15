@@ -23,7 +23,8 @@ class AudioService {
     };
     this.clickAudio = new Audio(buttonClickUrl);
     this.clickAudio.volume = 0.7;
-    this.enabled = true;
+    this.musicEnabled = true;
+    this.sfxEnabled = true;
     this.sfxCache = new Map();
     this.loops = new Map();
     this.current = null; // 'menu' | 'loading' | 'match:<id>' | null
@@ -58,7 +59,7 @@ class AudioService {
 
   sync() {
     Object.entries(this.tracks).forEach(([name, audio]) => {
-      if (this.enabled && this.current === name) {
+      if (this.musicEnabled && this.current === name) {
         audio
           .play()
           .then(() => this.unbindUnlock())
@@ -70,10 +71,14 @@ class AudioService {
     });
   }
 
-  setEnabled(enabled) {
-    this.enabled = enabled;
-    if (!enabled) [...this.loops.keys()].forEach((key) => this.stopLoop(key));
+  setMusicEnabled(enabled) {
+    this.musicEnabled = enabled;
     this.sync();
+  }
+
+  setSfxEnabled(enabled) {
+    this.sfxEnabled = enabled;
+    if (!enabled) [...this.loops.keys()].forEach((key) => this.stopLoop(key));
   }
 
   // 'menu' on menu screens, 'loading' while waiting for the opponent, null during a match.
@@ -102,7 +107,7 @@ class AudioService {
   }
 
   playClick() {
-    if (!this.enabled) return;
+    if (!this.sfxEnabled) return;
     const sfx = this.clickAudio.cloneNode();
     sfx.volume = this.clickAudio.volume;
     sfx.play().catch(() => {});
@@ -110,7 +115,7 @@ class AudioService {
 
   // One-shot sound effect; `volume` is 0-1 on top of the effect's own base level.
   playSfx(url, volume = 1) {
-    if (!this.enabled || !url || volume <= 0.01) return;
+    if (!this.sfxEnabled || !url || volume <= 0.01) return;
     let base = this.sfxCache.get(url);
     if (!base) {
       base = new Audio(url);
@@ -124,7 +129,7 @@ class AudioService {
 
   // Looping effect (e.g. footsteps) identified by `key`; no-op if it is already running.
   startLoop(key, url, volume = 1) {
-    if (!this.enabled || this.loops.has(key)) return;
+    if (!this.sfxEnabled || this.loops.has(key)) return;
     const audio = new Audio(url);
     audio.loop = true;
     audio.volume = Math.min(1, volume);

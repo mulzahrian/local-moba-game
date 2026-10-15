@@ -22,6 +22,7 @@ import './styles/App.css';
 function App() {
   const t = useT();
   const musicOn = useSettingsStore((state) => state.musicOn);
+  const sfxOn = useSettingsStore((state) => state.sfxOn);
   const currentMap = useGameStore((state) => state.currentMap);
   const setCurrentMap = useGameStore((state) => state.setCurrentMap);
   const currentEnvironment = useGameStore((state) => state.currentEnvironment);
@@ -45,8 +46,12 @@ function App() {
   const reset = useGameStore((state) => state.reset);
 
   useEffect(() => {
-    audioService.setEnabled(musicOn);
+    audioService.setMusicEnabled(musicOn);
   }, [musicOn]);
+
+  useEffect(() => {
+    audioService.setSfxEnabled(sfxOn);
+  }, [sfxOn]);
 
   // Menu music on menu screens, loading music while waiting in the lobby, the map's own music in a match.
   useEffect(() => {

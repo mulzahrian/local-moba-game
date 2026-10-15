@@ -62,6 +62,7 @@ export const translations = {
 
     'settings.title': 'Settings',
     'settings.music': 'Music',
+    'settings.sfx': 'Sound effects',
     'settings.language': 'Language',
 
     'maps.title': 'Map Generator',
@@ -512,6 +513,7 @@ export const translations = {
 
     'settings.title': 'Pengaturan',
     'settings.music': 'Musik',
+    'settings.sfx': 'Efek suara',
     'settings.language': 'Bahasa',
 
     'maps.title': 'Pembuat Peta',
