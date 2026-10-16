@@ -208,6 +208,35 @@ export function volumetricShell(fx, radius, color, height = 1) {
 const reach = (range) => Math.min(Math.max(range, 4), 40);
 
 const BUILDERS = {
+  waterSplash() {
+    const fx = new Fx(0.7);
+    const rings = [
+      { delay: 0, mesh: fx.ring(0.12, 0.2, 0xb9f8ff, 0.95, 0.09) },
+      { delay: 0.12, mesh: fx.ring(0.08, 0.14, 0x65d9f2, 0.8, 0.1) }
+    ];
+    const droplets = fx.particles(18, 0xb8f6ff, 0.22, false);
+    const seeds = Array.from({ length: 18 }, (_, i) => ({
+      angle: (i / 18) * TAU + rand(-0.18, 0.18),
+      speed: rand(1.6, 3.5),
+      height: rand(1.2, 2.8)
+    }));
+    fx.tick = (t) => {
+      rings.forEach(({ delay, mesh }) => {
+        const u = clamp01((t - delay) / 0.52);
+        mesh.visible = u > 0 && u < 1;
+        mesh.scale.setScalar(Math.max(0.01, 2.8 * easeOut(u)));
+      });
+      seeds.forEach((seed, i) => {
+        const u = clamp01(t / 0.58);
+        const distance = seed.speed * u;
+        const y = 0.1 + seed.height * 3.2 * u * (1 - u);
+        droplets.set(i, Math.cos(seed.angle) * distance, y, Math.sin(seed.angle) * distance);
+      });
+      droplets.commit();
+    };
+    return fx;
+  },
+
   magicCircle({ range, shape }) {
     const R = areaRadius(range, shape);
     const fx = new Fx(1.8);

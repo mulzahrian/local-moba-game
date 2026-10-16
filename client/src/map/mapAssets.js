@@ -8,6 +8,7 @@ import { CHARACTER_HEIGHT } from '../character/characterAssets.js';
 import monsterLogoUrl from '../public/assets/logo/monster-logo.png';
 import pattern1Url from '../public/pattern/pattern1.png';
 import pattern2Url from '../public/pattern/pattern2.png';
+import waterPatternUrl from '../public/pattern/water-pattern.png';
 
 const DEFAULT_FIT_SIZE = 10;
 
@@ -23,7 +24,8 @@ export const MONSTER_CATEGORY = 'monsters';
 export const PATTERN_CATEGORY = 'patterns';
 const PATTERN_DEFINITIONS = [
   { id: 'pattern:pattern1', name: { en: 'Pattern 1', id: 'Pattern 1' }, imageUrl: pattern1Url, size: 30 },
-  { id: 'pattern:pattern2', name: { en: 'Pattern 2', id: 'Pattern 2' }, imageUrl: pattern2Url, size: 30 }
+  { id: 'pattern:pattern2', name: { en: 'Pattern 2', id: 'Pattern 2' }, imageUrl: pattern2Url, size: 30 },
+  { id: 'pattern:water-pattern', name: { en: 'Water Pattern', id: 'Pola Air' }, imageUrl: waterPatternUrl, size: 30, water: true }
 ];
 const patternDefinitions = new Map(PATTERN_DEFINITIONS.map((definition) => [definition.id, {
   ...definition,
@@ -203,6 +205,47 @@ function createPattern(def) {
   return group;
 }
 
+function createWaterPattern(def) {
+  const texture = new THREE.TextureLoader().load(def.imageUrl);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  // The PNG already contains the complete water shape and transparent edges.
+  // Keep it 1:1: repeating it creates visible square/tile borders around the water.
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+
+  const material = new THREE.MeshPhongMaterial({
+      map: texture,
+      color: 0x8ed9e8,
+      transparent: true,
+      opacity: 0.78,
+      alphaTest: 0.02,
+      shininess: 100,
+      specular: 0xb9f7ff,
+      emissive: 0x0b5c76,
+      emissiveIntensity: 0.22,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(def.size || DEFAULT_FIT_SIZE, def.size || DEFAULT_FIT_SIZE),
+    material
+  );
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.y = 0.1;
+  mesh.receiveShadow = true;
+  mesh.renderOrder = 1;
+
+  const group = new THREE.Group();
+  group.add(mesh);
+  group.userData.update = (delta) => {
+    const time = performance.now() * 0.001;
+    mesh.material.opacity = 0.75 + Math.sin(time * 2) * 0.035;
+    mesh.material.emissiveIntensity = 0.2 + Math.sin(time * 1.6) * 0.04;
+  };
+  return group;
+}
+
 /**
  * A placed map object: `root` carries position / rotation / user scale, `model` holds
  * the (auto-fitted) GLB. Animation is optional and driven by `update(delta)`.
@@ -227,7 +270,9 @@ export class MapObject {
     this.def = getObjectDefinition(this.data.type);
     const url = modelUrlOf(this.def);
     let model;
-    if (this.def?.pattern) {
+    if (this.def?.water) {
+      model = createWaterPattern(this.def);
+    } else if (this.def?.pattern) {
       model = createPattern(this.def);
     } else if (!url) {
       model = createPlaceholder(this.def);
@@ -293,6 +338,7 @@ export class MapObject {
 
   update(delta) {
     if (this.mixer) this.mixer.update(delta);
+    this.model?.userData.update?.(delta);
   }
 
   dispose() {

@@ -23,6 +23,7 @@ import '../character/towerEffects.js';
 import { useSkillStore } from '../store/skillStore.js';
 import { useSettingsStore } from '../store/settingsStore.js';
 import { translate } from '../i18n/index.js';
+import walkingWaterSound from '../music/effect/vfx/walking-water.mp3';
 
 const UNIT_SCALE = 0.25; // characters are drawn at 0.25x relative to the map; scales character-attached helpers
 const MOVE_SPEED = 45 * UNIT_SCALE; // units per second
@@ -58,6 +59,8 @@ const GHOST_OPACITY = 0.35; // how visible an invisible player is to its own tea
 const DOMINATED_SPEED_FACTOR = 0.7; // mind-controlled players are dragged along slower than they walk
 const DOMINATED_STOP_DISTANCE = 3;
 const MONSTER_BAR_COLOR = 0xd04a3a;
+const WATER_PATTERN_TYPE = 'pattern:water-pattern';
+const WATER_SPLASH_INTERVAL = 0.28;
 
 const isTypingTarget = (target) =>
   target instanceof HTMLElement &&
@@ -744,7 +747,9 @@ export class GameScene {
       lastAttackAt: 0,
       sendLockUntil: 0,
       queuedAttack: false,
-      moveVelocity: new THREE.Vector3()
+      moveVelocity: new THREE.Vector3(),
+      waterSplashCooldown: 0,
+      inWater: false
     });
   }
 
@@ -828,6 +833,41 @@ export class GameScene {
         mesh.position.lerp(targetPosition, blend);
       }
     }
+  }
+
+  // Water patterns are non-collision map objects, so movement can cross them freely.
+  // Check the transformed square footprint and emit a short splash while a player walks.
+  isWaterAt(x, z) {
+    return this.mapObjects.some((object) => {
+      if (object.data.type !== WATER_PATTERN_TYPE) return false;
+      const def = object.def || { size: 30 };
+      const data = object.data;
+      const angle = THREE.MathUtils.degToRad(data.rotationY || 0);
+      const dx = x - data.position.x;
+      const dz = z - data.position.z;
+      const localX = dx * Math.cos(angle) - dz * Math.sin(angle);
+      const localZ = dx * Math.sin(angle) + dz * Math.cos(angle);
+      const scale = data.scale || 1;
+      const halfX = (def.size || 30) * Math.abs(scale * (data.scaleX || 1)) / 2;
+      const halfZ = (def.size || 30) * Math.abs(scale * (data.scaleZ || 1)) / 2;
+      return Math.abs(localX) <= halfX && Math.abs(localZ) <= halfZ;
+    });
+  }
+
+  updateWaterContacts(delta) {
+    let localWaterWalking = false;
+    for (const player of this.players.values()) {
+      player.waterSplashCooldown = Math.max(0, player.waterSplashCooldown - delta);
+      const inWater = this.isWaterAt(player.mesh.position.x, player.mesh.position.z);
+      if (inWater && player.isMoving && player.waterSplashCooldown <= 0) {
+        this.effects.spawn('waterSplash', { position: player.mesh.position, range: 3 });
+        player.waterSplashCooldown = WATER_SPLASH_INTERVAL;
+      }
+      player.inWater = inWater;
+      if (player.isCurrentPlayer && inWater && player.isMoving) localWaterWalking = true;
+    }
+    if (localWaterWalking) audioService.startLoop('water-walk', walkingWaterSound, 0.65);
+    else audioService.stopLoop('water-walk');
   }
 
   // Sends the local player's final position once movement stops, so remote clients
@@ -1405,6 +1445,7 @@ export class GameScene {
     this.processQueuedActions();
     this.updateDisplacements(delta);
     this.updateRemotePlayers(delta);
+    this.updateWaterContacts(delta);
     this.mapObjects.forEach((object) => object.update(delta));
     this.pathWalkers.forEach((walker) => walker.update(delta));
     const now = performance.now();
@@ -1439,6 +1480,7 @@ export class GameScene {
     this.disposed = true;
     cancelAnimationFrame(this.frameId);
     audioService.stopLoop('run');
+    audioService.stopLoop('water-walk');
     this.environment.dispose();
     this.container.removeEventListener('mousedown', this.onMouseDown);
     this.container.removeEventListener('mousemove', this.onMove);
