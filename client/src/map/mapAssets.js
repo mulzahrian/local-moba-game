@@ -186,7 +186,7 @@ function createPattern(def) {
   texture.wrapT = THREE.ClampToEdgeWrapping;
   const mesh = new THREE.Mesh(
     new THREE.PlaneGeometry(def.size || DEFAULT_FIT_SIZE, def.size || DEFAULT_FIT_SIZE),
-    new THREE.MeshBasicMaterial({
+    new THREE.MeshLambertMaterial({
       map: texture,
       transparent: true,
       alphaTest: 0.05,
@@ -196,6 +196,7 @@ function createPattern(def) {
   );
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.y = 0.08;
+  mesh.receiveShadow = true;
   mesh.renderOrder = 1;
   const group = new THREE.Group();
   group.add(mesh);
