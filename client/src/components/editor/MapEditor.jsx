@@ -26,6 +26,7 @@ import { AGGRO_RANGE, clampAggroRange } from '../../../../shared/monsterConfig.j
 import { PATH_ANIM_SPEED, PATH_SPEED, PATH_SCALE, guessWalkAnimation } from '../../../../shared/pathConfig.js';
 import { GameScene } from '../../scenes/GameScene.js';
 import { CategoryIcon, CameraIcon } from './FantasyIcons.jsx';
+import { MapObjectPreview } from './MapObjectPreview.jsx';
 import { CharacterPicker } from '../character/CharacterPicker.jsx';
 import { SkillBar } from '../SkillBar.jsx';
 import { useT } from '../../i18n/index.js';
@@ -566,6 +567,7 @@ export function MapEditor({ mapId, onExit }) {
           {selected && (
             <>
               <h3>{t('editor.selected')}</h3>
+              <MapObjectPreview type={selected.type} settings={selected} />
               <div className="ed-object-name">
                 {localizedName(getObjectDefinition(selected.type), language) || selected.type}
               </div>
@@ -707,6 +709,7 @@ export function MapEditor({ mapId, onExit }) {
           {!selected && !selectedPath && placeSettings && (
             <>
               <h3>{t('editor.placeSettings')}</h3>
+              <MapObjectPreview type={placingType} settings={placeSettings} />
               <div className="ed-object-name">
                 {t('editor.placing')}: {localizedName(getObjectDefinition(placingType), language)}
               </div>
