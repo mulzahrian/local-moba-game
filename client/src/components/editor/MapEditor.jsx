@@ -270,6 +270,7 @@ export function MapEditor({ mapId, onExit }) {
     setPlacingType(def.id);
     scene().setPlacingType(def.id, {
       animation: def.defaultAnimation || null,
+      ...(def.pattern ? { noCollision: true } : {}),
       ...(def.monster ? { aggroRange: AGGRO_RANGE.value } : {})
     });
   };

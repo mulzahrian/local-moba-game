@@ -6,6 +6,8 @@ import { monsterApi } from '../monster/monsterApi.js';
 import { FLIGHT_HEIGHT, monsterObjectType } from '../../../shared/monsterConfig.js';
 import { CHARACTER_HEIGHT } from '../character/characterAssets.js';
 import monsterLogoUrl from '../public/assets/logo/monster-logo.png';
+import pattern1Url from '../public/pattern/pattern1.png';
+import pattern2Url from '../public/pattern/pattern2.png';
 
 const DEFAULT_FIT_SIZE = 10;
 
@@ -18,6 +20,16 @@ const DEFAULT_FIT_SIZE = 10;
 
 const CUSTOM_PREFIX = 'custom:';
 export const MONSTER_CATEGORY = 'monsters';
+export const PATTERN_CATEGORY = 'patterns';
+const PATTERN_DEFINITIONS = [
+  { id: 'pattern:pattern1', name: { en: 'Pattern 1', id: 'Pattern 1' }, imageUrl: pattern1Url, size: 30 },
+  { id: 'pattern:pattern2', name: { en: 'Pattern 2', id: 'Pattern 2' }, imageUrl: pattern2Url, size: 30 }
+];
+const patternDefinitions = new Map(PATTERN_DEFINITIONS.map((definition) => [definition.id, {
+  ...definition,
+  category: PATTERN_CATEGORY,
+  pattern: true
+}]));
 let customCategories = [];
 let customDefinitions = new Map();
 let libraryPromise = null;
@@ -97,15 +109,15 @@ export function invalidateObjectLibrary() {
 }
 
 export function getCategories() {
-  return customCategories;
+  return [...customCategories, { id: PATTERN_CATEGORY, name: { en: 'Patterns', id: 'Pattern' } }];
 }
 
 export function getObjectDefinitions() {
-  return [...customDefinitions.values()];
+  return [...customDefinitions.values(), ...patternDefinitions.values()];
 }
 
 export function getObjectDefinition(id) {
-  return customDefinitions.get(id) || null;
+  return customDefinitions.get(id) || patternDefinitions.get(id) || null;
 }
 
 export function localizedName(def, language) {
@@ -167,6 +179,29 @@ function createPlaceholder(def) {
   return group;
 }
 
+function createPattern(def) {
+  const texture = new THREE.TextureLoader().load(def.imageUrl);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(def.size || DEFAULT_FIT_SIZE, def.size || DEFAULT_FIT_SIZE),
+    new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      alphaTest: 0.05,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    })
+  );
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.y = 0.08;
+  mesh.renderOrder = 1;
+  const group = new THREE.Group();
+  group.add(mesh);
+  return group;
+}
+
 /**
  * A placed map object: `root` carries position / rotation / user scale, `model` holds
  * the (auto-fitted) GLB. Animation is optional and driven by `update(delta)`.
@@ -191,7 +226,9 @@ export class MapObject {
     this.def = getObjectDefinition(this.data.type);
     const url = modelUrlOf(this.def);
     let model;
-    if (!url) {
+    if (this.def?.pattern) {
+      model = createPattern(this.def);
+    } else if (!url) {
       model = createPlaceholder(this.def);
     } else {
       try {

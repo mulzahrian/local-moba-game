@@ -501,6 +501,7 @@ export class MapEditorScene {
       ...(this.placeSettings.rotationZ ? { rotationZ: this.placeSettings.rotationZ } : {}),
       scale: this.placeSettings.scale,
       animation: this.placeSettings.animation,
+      ...(definition?.pattern ? { noCollision: true } : {}),
       ...(definition?.tower ? { tower: true, ...nextTowerSettings(this.getObjects()) } : {}),
       ...(definition?.monster ? { monster: true, aggroRange: this.placeSettings.aggroRange ?? AGGRO_RANGE.value } : {})
     };
