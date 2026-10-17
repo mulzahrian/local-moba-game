@@ -230,6 +230,7 @@ export class GameScene {
   }
 
   setupBoard(size = DEFAULT_ARENA_SIZE, withMarkers = true) {
+    this.mapSize = size;
     this.environment?.setSkyboxSize(size);
     if (this.boardGroup) {
       this.scene.remove(this.boardGroup);
@@ -269,6 +270,7 @@ export class GameScene {
 
   // Rebuilds the arena from a saved map (null keeps the default arena) and places its objects and towers.
   loadMap(map) {
+    this.mapData = map;
     this.clearMapObjects();
     this.clearWorld();
     this.clearTowers();
@@ -301,6 +303,91 @@ export class GameScene {
       });
     }
     this.setupTowers(towers);
+  }
+
+  // Draws the lightweight 2D tactical view used by the React HUD. It deliberately uses
+  // the scene's live positions, so players and objectives stay useful while moving.
+  drawMinimap(canvas) {
+    if (!canvas) return;
+    const width = Math.max(1, Math.round(canvas.clientWidth * window.devicePixelRatio));
+    const height = Math.max(1, Math.round(canvas.clientHeight * window.devicePixelRatio));
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+    const ctx = canvas.getContext('2d');
+    const side = Math.min(width, height);
+    const offsetX = (width - side) / 2;
+    const offsetY = (height - side) / 2;
+    const mapSize = this.mapSize || DEFAULT_ARENA_SIZE;
+    const toMap = (x, z) => ({
+      x: offsetX + ((x + mapSize / 2) / mapSize) * side,
+      y: offsetY + ((z + mapSize / 2) / mapSize) * side
+    });
+
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = '#162425';
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = '#24413b';
+    ctx.fillRect(offsetX, offsetY, side, side);
+
+    // Subtle grid and diagonal lanes make an empty/default arena readable too.
+    ctx.strokeStyle = 'rgba(164, 211, 164, 0.12)';
+    ctx.lineWidth = Math.max(1, window.devicePixelRatio);
+    for (let i = 1; i < 5; i += 1) {
+      const p = offsetX + (side * i) / 5;
+      ctx.beginPath(); ctx.moveTo(p, offsetY); ctx.lineTo(p, offsetY + side); ctx.stroke();
+      const q = offsetY + (side * i) / 5;
+      ctx.beginPath(); ctx.moveTo(offsetX, q); ctx.lineTo(offsetX + side, q); ctx.stroke();
+    }
+    const lane = (from, to) => {
+      const a = toMap(from.x, from.z); const b = toMap(to.x, to.z);
+      ctx.strokeStyle = 'rgba(218, 190, 120, 0.22)';
+      ctx.lineWidth = Math.max(2, side * 0.012);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    };
+    lane({ x: -mapSize * 0.4, z: -mapSize * 0.4 }, { x: mapSize * 0.4, z: mapSize * 0.4 });
+
+    // Saved paths and placed objects provide a visual outline of custom maps.
+    (this.mapData?.paths || []).forEach((path) => {
+      if (path.points?.length < 2) return;
+      ctx.strokeStyle = path.type === 'water' ? 'rgba(77, 180, 220, 0.72)' : 'rgba(233, 215, 155, 0.5)';
+      ctx.lineWidth = Math.max(2, side * 0.009);
+      ctx.beginPath();
+      path.points.forEach((point, index) => {
+        const p = toMap(point.x, point.z);
+        if (index === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+      });
+      ctx.stroke();
+    });
+    this.mapObjects.forEach((object) => {
+      if (object.data?.tower || object.data?.type?.includes?.('water')) return;
+      const p = toMap(object.data.position.x, object.data.position.z);
+      ctx.fillStyle = object.data?.type?.startsWith?.('pattern:') ? '#5e9e83' : '#bd9a5c';
+      ctx.globalAlpha = 0.8;
+      ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+    });
+    ctx.globalAlpha = 1;
+
+    this.towers.forEach((tower) => {
+      const p = toMap(tower.position.x, tower.position.z);
+      ctx.fillStyle = tower.team === 'team1' ? '#ef6d67' : '#54d0c0';
+      ctx.strokeStyle = '#f3d992';
+      ctx.lineWidth = Math.max(1, side * 0.006);
+      ctx.beginPath(); ctx.arc(p.x, p.y, tower.main ? 6 : 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    });
+
+    this.players.forEach((player) => {
+      const p = toMap(player.mesh.position.x, player.mesh.position.z);
+      const current = player.isCurrentPlayer;
+      ctx.fillStyle = current ? '#fff4a8' : (player.data.team === 'team1' ? '#ff7770' : '#63e6d1');
+      ctx.strokeStyle = current ? '#ffffff' : '#14201e';
+      ctx.lineWidth = Math.max(1, side * 0.006);
+      ctx.beginPath(); ctx.arc(p.x, p.y, current ? 5 : 3.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    });
+    ctx.strokeStyle = 'rgba(244, 215, 138, 0.7)';
+    ctx.lineWidth = Math.max(1, window.devicePixelRatio);
+    ctx.strokeRect(offsetX + 0.5, offsetY + 0.5, side - 1, side - 1);
   }
 
   // ---------------------------------------------------------------------------

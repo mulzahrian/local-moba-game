@@ -134,17 +134,64 @@
 }
 
 .minimap {
-  width: 160px;
-  height: 160px;
+  width: 220px;
+  padding: 9px;
   overflow: hidden;
   pointer-events: auto;
+}
+
+.minimap-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 2px 7px;
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+
+.minimap-heading small {
+  color: var(--gold-dark);
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 
 #minimap-canvas {
   display: block;
   width: 100%;
-  height: 100%;
+  height: 176px;
+  border: 1px solid rgba(244, 215, 138, 0.28);
+  border-radius: 5px;
+  background: #121a1b;
 }
+
+.minimap-legend {
+  display: flex;
+  justify-content: space-between;
+  margin: 6px 2px 0;
+  color: rgba(236, 217, 168, 0.75);
+  font-family: Arial, sans-serif;
+  font-size: 8px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 2px;
+  border-radius: 50%;
+  box-shadow: 0 0 4px currentColor;
+}
+
+.legend-dot.you { color: #fff4a8; background: #fff4a8; }
+.legend-dot.ally { color: #63e6d1; background: #63e6d1; }
+.legend-dot.base { color: #e5a850; background: #e5a850; }
 
 /* ----- Bottom center dock: hero card + skills + money ----- */
 .hud-dock {

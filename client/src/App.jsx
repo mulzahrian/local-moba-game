@@ -342,6 +342,7 @@ function App() {
             players={players}
             currentPlayerId={socketService.socket?.id}
             roomCode={roomCode}
+            currentMap={currentMap}
             getScene={getGameScene}
             onLeaveRoom={handleLeaveRoom}
           />
