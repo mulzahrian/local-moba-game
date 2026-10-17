@@ -1,5 +1,9 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import grassUrl from '../public/assets/texture/grass.jpg';
+
+// Served from Vite's public directory because GLB is loaded by GLTFLoader at runtime.
+const skyboxUrl = '/assets/skybox/skybox_skydays_3.glb';
 
 export const SKY_OPTIONS = ['darkFantasy', 'bright'];
 export const WEATHER_OPTIONS = ['clear', 'rain'];
@@ -32,6 +36,7 @@ const RAIN_FALL_SPEED = 90;
 const RAIN_DROP_LENGTH = 2.5;
 
 let groundTexture = null;
+const skyboxLoader = new GLTFLoader();
 
 // Shared by every scene; tiling is baked into the ground geometry UVs rather than texture.repeat.
 export function getGroundTexture() {
@@ -71,9 +76,60 @@ export class Environment {
     this.fogScale = fogScale;
     this.rainArea = rainArea;
     this.rain = null;
+    this.skybox = null;
+    this.skyboxSize = 800;
+    this.skyboxLoadToken = 0;
     this.sky = DEFAULT_SKY;
     this.weather = DEFAULT_WEATHER;
+    this.loadSkybox();
     this.apply(DEFAULT_SKY, DEFAULT_WEATHER);
+  }
+
+  loadSkybox() {
+    const token = ++this.skyboxLoadToken;
+    skyboxLoader.load(skyboxUrl, (gltf) => {
+      if (token !== this.skyboxLoadToken) return;
+
+      const skybox = gltf.scene;
+      const bounds = new THREE.Box3().setFromObject(skybox);
+      const center = bounds.getCenter(new THREE.Vector3());
+      const size = bounds.getSize(new THREE.Vector3());
+      const maxSide = Math.max(size.x, size.y, size.z) || 1;
+
+      // The supplied model is authored in a much larger unit scale than the game.
+      // Normalize it so it surrounds the arena while remaining inside the camera far plane.
+      skybox.position.sub(center);
+      skybox.scale.setScalar(this.skyboxSize / maxSide);
+      skybox.traverse((child) => {
+        if (!child.isMesh) return;
+        child.frustumCulled = false;
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        const preparedMaterials = materials.map((material) => {
+          const copy = material.clone();
+          // The source is a cube with double-sided material data. Keep both sides
+          // visible because exported GLB winding varies between skybox tools.
+          copy.side = THREE.DoubleSide;
+          copy.depthWrite = false;
+          copy.depthTest = false;
+          copy.fog = false;
+          return copy;
+        });
+        child.material = Array.isArray(child.material) ? preparedMaterials : preparedMaterials[0];
+      });
+      skybox.renderOrder = -100;
+      this.skybox = skybox;
+      this.scene.add(skybox);
+    }, undefined, (error) => {
+      console.warn('[Environment] Could not load skybox:', error);
+    });
+  }
+
+  setSkyboxSize(arenaSize) {
+    this.skyboxSize = Math.max(800, arenaSize * 4);
+    if (!this.skybox) return;
+    const bounds = new THREE.Box3().setFromObject(this.skybox);
+    const maxSide = Math.max(...bounds.getSize(new THREE.Vector3()).toArray()) || 1;
+    this.skybox.scale.multiplyScalar(this.skyboxSize / maxSide);
   }
 
   apply(sky, weather) {
@@ -146,6 +202,16 @@ export class Environment {
   }
 
   dispose() {
+    this.skyboxLoadToken += 1;
+    if (this.skybox) {
+      this.scene.remove(this.skybox);
+      this.skybox.traverse((child) => {
+        if (child.geometry) child.geometry.dispose();
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        materials.filter(Boolean).forEach((material) => material.dispose());
+      });
+      this.skybox = null;
+    }
     if (this.rain) {
       this.scene.remove(this.rain);
       this.rain.geometry.dispose();

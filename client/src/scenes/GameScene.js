@@ -230,6 +230,7 @@ export class GameScene {
   }
 
   setupBoard(size = DEFAULT_ARENA_SIZE, withMarkers = true) {
+    this.environment?.setSkyboxSize(size);
     if (this.boardGroup) {
       this.scene.remove(this.boardGroup);
       this.boardGroup.traverse((child) => {

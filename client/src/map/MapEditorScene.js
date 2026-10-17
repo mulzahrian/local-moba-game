@@ -181,6 +181,7 @@ export class MapEditorScene {
   }
 
   setupGround(size) {
+    this.environment?.setSkyboxSize(size);
     if (this.ground) {
       this.scene.remove(this.ground);
       this.ground.geometry.dispose();
