@@ -1,4 +1,4 @@
-import { BUILTIN_CHARACTER_ID, BUILTIN_CHARACTER_NAME, DEFAULT_ROLE, MANA_REGEN_PER_SECOND, RESPAWN_SECONDS, getRoleConfig } from '../../shared/characterConfig.js';
+import { BUILTIN_CHARACTER_ID, BUILTIN_CHARACTER_NAME, DEFAULT_ROLE, MANA_REGEN_PER_SECOND, RESPAWN_BASE_SECONDS, RESPAWN_INCREMENT_SECONDS, getRoleConfig } from '../../shared/characterConfig.js';
 import { DEFAULT_MAP_SIZE, buildTowers, getSpawnPosition, getTowerForTeam } from '../../shared/mapConfig.js';
 import { DEFAULT_TEAM_SIZE, TEAMS } from '../../shared/matchConfig.js';
 import { BOT_TICK_MS, pickBotName, tickBots } from './bots.js';
@@ -29,6 +29,9 @@ function createPlayer(id, name, team, slot, position, character, isBot = false) 
     level: 1,
     experience: 0,
     dead: false,
+    deathCount: 0,
+    respawnAt: 0,
+    respawnDelay: 0,
     cooldowns: {},
     loadout: [], // ids of the equipped skills (see loadouts.js)
     invisibleUntil: 0
@@ -72,8 +75,8 @@ class GameManager {
   broadcastAttack(room, payload) {
     this.io.to(room.code).emit('entityAttack', { ...payload, players: room.players });
     if (payload.targetKind === 'player' && payload.hit?.died) {
-      this.scheduleRespawn(room.code, payload.targetId);
-      this.io.to(room.code).emit('playerDied', { playerId: payload.targetId, killerId: payload.id });
+      const respawn = this.scheduleRespawn(room.code, payload.targetId);
+      this.io.to(room.code).emit('playerDied', { playerId: payload.targetId, killerId: payload.id, ...respawn });
     }
   }
 
@@ -178,8 +181,8 @@ class GameManager {
     }
     event.hits.filter((hit) => hit.died).forEach((hit) => {
       console.log(`[Combat] ${hit.targetId} was defeated by ${caster.id}`);
-      this.scheduleRespawn(room.code, hit.targetId);
-      this.io.to(room.code).emit('playerDied', { playerId: hit.targetId, killerId: caster.id });
+      const respawn = this.scheduleRespawn(room.code, hit.targetId);
+      this.io.to(room.code).emit('playerDied', { playerId: hit.targetId, killerId: caster.id, ...respawn });
     });
     event.monsterHits.filter((hit) => hit.died).forEach((hit) => {
       this.handleMonsterDeath(room, room.monsters.find((monster) => monster.id === hit.id));
@@ -288,8 +291,15 @@ class GameManager {
   scheduleRespawn(roomCode, playerId) {
     const room = this.rooms.get(roomCode);
     const player = room?.players.find((p) => p.id === playerId);
-    if (!player) return;
+    // Combat marks the player dead before this method is called; respawnAt is
+    // the actual duplicate-scheduling guard.
+    if (!player || player.respawnAt) return null;
+    const respawnDelay = RESPAWN_BASE_SECONDS + player.deathCount * RESPAWN_INCREMENT_SECONDS;
+    const respawnAt = Date.now() + respawnDelay * 1000;
     player.dead = true;
+    player.deathCount += 1;
+    player.respawnAt = respawnAt;
+    player.respawnDelay = respawnDelay;
     setTimeout(() => {
       const current = this.rooms.get(roomCode)?.players.find((p) => p.id === playerId);
       if (!current) return;
@@ -300,8 +310,11 @@ class GameManager {
       current.cooldowns = {};
       current.invisibleUntil = 0;
       current.dominatedUntil = 0;
+      current.respawnAt = 0;
+      current.respawnDelay = 0;
       this.io.to(roomCode).emit('playerRespawned', { player: current });
-    }, RESPAWN_SECONDS * 1000);
+    }, respawnDelay * 1000);
+    return { respawnAt, respawnDelay, deathCount: player.deathCount };
   }
 
   createRoom(roomCode, hostId, hostName, map = null, environment = null, character, options = {}) {

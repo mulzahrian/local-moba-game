@@ -10,6 +10,7 @@ const percent = (value, max) => Math.max(0, Math.min(100, (value / (max || 1)) *
 export function HeroCard({ player }) {
   const t = useT();
   const [minimized, setMinimized] = useState(false);
+  const [respawnSeconds, setRespawnSeconds] = useState(0);
   const [character, setCharacter] = useState(null);
   const characterId = player?.characterId;
 
@@ -22,6 +23,17 @@ export function HeroCard({ player }) {
       cancelled = true;
     };
   }, [characterId]);
+
+  useEffect(() => {
+    if (!player?.dead || !player.respawnAt) {
+      setRespawnSeconds(0);
+      return undefined;
+    }
+    const update = () => setRespawnSeconds(Math.max(0, Math.ceil((player.respawnAt - Date.now()) / 1000)));
+    update();
+    const timer = setInterval(update, 250);
+    return () => clearInterval(timer);
+  }, [player?.dead, player?.respawnAt]);
 
   if (!player) return null;
 
@@ -56,6 +68,11 @@ export function HeroCard({ player }) {
           <span className="fill" style={{ width: `${percent(mana, maxMana)}%` }} />
           <span className="value">{mana} / {maxMana}</span>
         </div>
+        {player.dead && respawnSeconds > 0 && (
+          <div className="respawn-countdown" role="status">
+            {t('hud.respawnIn', { seconds: respawnSeconds })}
+          </div>
+        )}
       </div>
 
       <button

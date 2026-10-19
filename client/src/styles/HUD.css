@@ -227,6 +227,14 @@
 }
 
 .hero-card.dead { filter: grayscale(0.8); }
+.respawn-countdown {
+  margin-top: 0.35rem;
+  color: #ffd36a;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: center;
+  text-shadow: 0 1px 3px #000;
+}
 
 .hero-portrait {
   position: relative;

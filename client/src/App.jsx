@@ -181,6 +181,11 @@ function App() {
     });
 
     socketService.on('playerDied', (data) => {
+      setPlayers(useGameStore.getState().players.map((p) => (
+        p.id === data.playerId
+          ? { ...p, dead: true, health: 0, respawnAt: data.respawnAt, respawnDelay: data.respawnDelay, deathCount: data.deathCount }
+          : p
+      )));
       if (gameSceneRef.current) gameSceneRef.current.handlePlayerDied(data.playerId);
     });
 

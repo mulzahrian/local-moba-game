@@ -126,7 +126,9 @@ export const EFFECT_GROUPS = [
 export const MAX_ANIMATION_NAME = 120;
 export const HIT_RADIUS = 1.5; // approximate body radius used for hit detection
 export const MANA_REGEN_PER_SECOND = 4;
-export const RESPAWN_SECONDS = 3;
+// Respawn starts at five seconds and gets three seconds longer after each death.
+export const RESPAWN_BASE_SECONDS = 5;
+export const RESPAWN_INCREMENT_SECONDS = 3;
 export const EMOTE_COOLDOWN = 1.5;
 export const JUMP_COOLDOWN = 0.8;
 export const COMBO_WINDOW_SECONDS = 1.2; // attack 2 follows attack 1 if clicked within this time
