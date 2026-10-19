@@ -6,6 +6,7 @@ import { monsterApi } from '../monster/monsterApi.js';
 import { FLIGHT_HEIGHT, monsterObjectType } from '../../../shared/monsterConfig.js';
 import { CHARACTER_HEIGHT } from '../character/characterAssets.js';
 import monsterLogoUrl from '../public/assets/logo/monster-logo.png';
+import patternLogoUrl from '../public/assets/logo/pattern.png';
 import pattern1Url from '../public/pattern/pattern1.png';
 import pattern2Url from '../public/pattern/pattern2.png';
 import waterPatternUrl from '../public/pattern/water-pattern.png';
@@ -111,7 +112,11 @@ export function invalidateObjectLibrary() {
 }
 
 export function getCategories() {
-  return [...customCategories, { id: PATTERN_CATEGORY, name: { en: 'Patterns', id: 'Pattern' } }];
+  return [...customCategories, {
+    id: PATTERN_CATEGORY,
+    logoUrl: patternLogoUrl,
+    name: { en: 'Patterns', id: 'Pattern' }
+  }];
 }
 
 export function getObjectDefinitions() {
