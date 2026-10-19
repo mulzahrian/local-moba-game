@@ -7,7 +7,7 @@
   "weather": "clear",
   "music": "list3",
   "createdAt": "2026-10-06T14:08:29.864Z",
-  "updatedAt": "2026-10-06T15:02:05.244Z",
+  "updatedAt": "2026-10-19T09:51:20.504Z",
   "objects": [
     {
       "uid": "o-muwr1ew6-b28vg",
@@ -20,7 +20,9 @@
       "rotationY": 0,
       "scale": 1,
       "animation": "Armature|Up and Down",
-      "tower": true
+      "tower": true,
+      "team": "team1",
+      "main": true
     },
     {
       "uid": "o-muwr1kfl-mg73f",
@@ -33,7 +35,9 @@
       "rotationY": 0,
       "scale": 1,
       "animation": "Animated",
-      "tower": true
+      "tower": true,
+      "team": "team2",
+      "main": true
     },
     {
       "uid": "o-muwr33rg-bkw85",
@@ -1448,6 +1452,50 @@
       "rotationY": 0,
       "scale": 1.9,
       "animation": null
+    },
+    {
+      "uid": "o-mvf2l9ot-tav20",
+      "type": "custom:default-towers:stylized-magic-tower",
+      "position": {
+        "x": -35,
+        "y": 0,
+        "z": -45
+      },
+      "rotationY": 30,
+      "scale": 1,
+      "animation": null,
+      "tower": true,
+      "team": "team1",
+      "main": false
+    },
+    {
+      "uid": "o-mvf2m2i8-2fz46",
+      "type": "custom:default-towers:magic-fire-tower",
+      "position": {
+        "x": 40,
+        "y": 0,
+        "z": 50
+      },
+      "rotationY": 0,
+      "scale": 1,
+      "animation": "Object_0",
+      "tower": true,
+      "team": "team2",
+      "main": false
+    },
+    {
+      "uid": "o-mvf2qj1x-a43jj",
+      "type": "monster:dark-slayer",
+      "position": {
+        "x": -10,
+        "y": 0,
+        "z": -15
+      },
+      "rotationY": 0,
+      "scale": 1,
+      "animation": "Armature|Idle|Base Layer.001",
+      "monster": true,
+      "aggroRange": 25
     }
   ],
   "paths": []

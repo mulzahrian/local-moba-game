@@ -158,7 +158,11 @@ function App() {
 
     // The one who defeated a monster gets its reward: money and (when it has one) a skill.
     socketService.on('monsterDefeated', (data) => {
-      if (data.killerId !== socketService.socket?.id) return;
+      const currentPlayer = useGameStore.getState().players.find((player) => player.id === socketService.socket?.id);
+      const isWinningTeam = data.team
+        ? currentPlayer?.team === data.team
+        : data.killerId === socketService.socket?.id;
+      if (!isWinningTeam) return;
       const { push } = useToastStore.getState();
       if (data.gold > 0) {
         useWalletStore.getState().add(data.gold);

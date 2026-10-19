@@ -12,7 +12,6 @@ export const WORLD_TICK_MS = 100;
 
 const RETURN_SPEED_FACTOR = 1.6; // monsters hurry home after giving up a chase
 const HOME_REACHED = 1;
-const REGEN_PER_SECOND = 0.15; // share of max health a monster regains per second while returning / at home
 const SECOND_ATTACK_FACTOR = 1.25; // attack 2 hits a little harder than attack 1
 const STAND_OFF = 0.9; // attackers stop at this share of their range
 
@@ -125,9 +124,8 @@ function tickMonster(room, gm, monster, dt, now, limit) {
     if (distance(monster.position, monster.home) > HOME_REACHED) {
       monster.moving = stepToward(monster, monster.home, monster.speed * RETURN_SPEED_FACTOR, dt, limit) > 0;
     }
-    if (monster.health < monster.maxHealth) {
-      monster.health = Math.min(monster.maxHealth, monster.health + monster.maxHealth * REGEN_PER_SECOND * dt);
-    }
+    // Monsters are shared room entities. Returning home after a player dies
+    // must not restore their health or create a new monster.
     return;
   }
 

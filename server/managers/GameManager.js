@@ -90,6 +90,7 @@ class GameManager {
       id: monster.id,
       name: monster.name,
       killerId: monster.killerId,
+      team: room.players.find((player) => player.id === monster.killerId)?.team || null,
       skillId: monster.rewardSkillId,
       gold: monster.gold
     });
