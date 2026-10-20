@@ -28,7 +28,7 @@ import { GameScene } from '../../scenes/GameScene.js';
 import { CategoryIcon, CameraIcon } from './FantasyIcons.jsx';
 import { MapObjectPreview } from './MapObjectPreview.jsx';
 import { CharacterPicker } from '../character/CharacterPicker.jsx';
-import { SkillBar } from '../SkillBar.jsx';
+import { GameHUD } from '../GameHUD.jsx';
 import { useT } from '../../i18n/index.js';
 import { useSettingsStore } from '../../store/settingsStore.js';
 import { audioService } from '../../services/audioService.js';
@@ -759,7 +759,26 @@ export function MapEditor({ mapId, onExit }) {
             <span className="editor-preview-hint">{t('editor.previewHelp')}</span>
           </div>
           <div className="editor-preview-stage" ref={previewRef} />
-          <SkillBar getScene={getPreviewScene} />
+          <GameHUD
+            players={[{
+              id: 'preview',
+              name: t('editor.previewPlayer'),
+              team: 'team1',
+              characterId: previewMap.characterId,
+              characterName: previewMap.characterId,
+              role: 'fighter',
+              level: 1,
+              health: 100,
+              maxHealth: 100,
+              mana: 100,
+              maxMana: 100
+            }]}
+            currentPlayerId="preview"
+            roomCode="PREVIEW"
+            currentMap={previewMap}
+            getScene={getPreviewScene}
+            onLeaveRoom={stopPreview}
+          />
         </div>
       )}
 
