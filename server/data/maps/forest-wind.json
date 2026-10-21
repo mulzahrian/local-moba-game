@@ -7,7 +7,7 @@
   "weather": "clear",
   "music": "none",
   "createdAt": "2026-10-21T06:15:14.594Z",
-  "updatedAt": "2026-10-21T06:20:27.194Z",
+  "updatedAt": "2026-10-21T14:58:22.315Z",
   "objects": [
     {
       "uid": "o-mvhpri90-fvet3",
@@ -131,6 +131,42 @@
       "scale": 1.75,
       "animation": null,
       "noCollision": true
+    },
+    {
+      "uid": "o-mvi8hpsx-zlq6p",
+      "type": "custom:default-trees:stylized-tree-1",
+      "position": {
+        "x": 15,
+        "y": 0,
+        "z": 0
+      },
+      "rotationY": 0,
+      "scale": 1.85,
+      "animation": null
+    },
+    {
+      "uid": "o-mvi8i15u-rzjg7",
+      "type": "custom:default-trees:stylized-tree-1",
+      "position": {
+        "x": 20,
+        "y": 0,
+        "z": 5
+      },
+      "rotationY": 0,
+      "scale": 1.6,
+      "animation": null
+    },
+    {
+      "uid": "o-mvi8jfa5-i2ndc",
+      "type": "custom:default-trees:stylized-tree-1",
+      "position": {
+        "x": -25,
+        "y": 0,
+        "z": 15
+      },
+      "rotationY": 0,
+      "scale": 1.9,
+      "animation": null
     }
   ],
   "paths": []

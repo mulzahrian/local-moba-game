@@ -239,7 +239,10 @@ function createWaterPattern(def) {
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.y = 0.1;
   mesh.receiveShadow = true;
-  mesh.renderOrder = 1;
+  // Render the water before other transparent objects.  Keeping water after
+  // them makes its transparent/specular pass tint models placed on top of it
+  // as if they were reflected by the water surface.
+  mesh.renderOrder = -1;
 
   const group = new THREE.Group();
   group.add(mesh);
