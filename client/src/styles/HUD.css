@@ -126,6 +126,69 @@
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6), 0 0 14px rgba(224, 128, 94, 0.35);
 }
 
+/* ----- Animated leave confirmation ----- */
+.leave-game-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  pointer-events: auto;
+  background: radial-gradient(circle at center, rgba(87, 31, 17, 0.35), rgba(4, 3, 5, 0.91) 68%);
+  animation: leave-overlay-in 0.35s ease-out both;
+}
+.leave-game-overlay::before,
+.leave-game-overlay::after {
+  position: absolute;
+  width: 80vmin;
+  height: 80vmin;
+  border: 1px solid rgba(244, 215, 138, 0.16);
+  border-radius: 50%;
+  content: '';
+  animation: leave-rune-spin 24s linear infinite;
+}
+.leave-game-overlay::after {
+  width: 54vmin;
+  height: 54vmin;
+  border-style: dashed;
+  border-color: rgba(224, 128, 94, 0.22);
+  animation-direction: reverse;
+  animation-duration: 17s;
+}
+.leave-game-panel {
+  position: relative;
+  z-index: 1;
+  width: min(500px, calc(100% - 36px));
+  padding: 28px 34px 30px;
+  text-align: center;
+  background: linear-gradient(155deg, rgba(59, 31, 22, 0.98), rgba(17, 10, 10, 0.99));
+  border: 1px solid #d6a94e;
+  border-radius: 12px;
+  box-shadow: 0 0 0 3px rgba(91, 47, 25, 0.7), 0 18px 70px rgba(0, 0, 0, 0.9), 0 0 36px rgba(205, 74, 40, 0.22);
+  animation: leave-panel-in 0.65s cubic-bezier(0.2, 1.35, 0.4, 1) both;
+}
+.leave-game-sigil { display: flex; align-items: center; justify-content: center; gap: 18px; height: 54px; color: #f6c65b; text-shadow: 0 0 14px rgba(244, 180, 70, 0.75); }
+.leave-game-sigil span { font-size: 28px; opacity: 0.65; }
+.leave-game-sigil b { display: grid; width: 46px; height: 46px; place-items: center; border: 2px solid #f6c65b; border-radius: 50%; font-size: 28px; animation: leave-sigil-pulse 1.8s ease-in-out infinite; }
+.leave-game-rule { width: 82%; height: 1px; margin: 14px auto 18px; background: linear-gradient(90deg, transparent, #d6a94e, transparent); }
+.leave-game-panel h2 { margin: 0 0 10px; color: #ffe6a0; font-size: clamp(19px, 3vw, 26px); letter-spacing: 2px; text-transform: uppercase; text-shadow: 0 0 12px rgba(244, 215, 138, 0.35); }
+.leave-game-panel p { margin: 0 auto 25px; max-width: 390px; color: #d8bd82; line-height: 1.65; }
+.leave-game-actions { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+.leave-confirm-btn { color: #ffd9c9; border-color: #c45132; background: linear-gradient(180deg, rgba(137, 43, 25, 0.98), rgba(54, 13, 9, 0.98)); }
+.leave-confirm-btn:hover { border-color: #ff9b78; box-shadow: 0 0 18px rgba(224, 86, 52, 0.5); }
+.leave-game-embers { position: absolute; inset: 0; pointer-events: none; }
+.leave-game-embers i { position: absolute; left: calc(8% + var(--i) * 7.8%); bottom: -10px; width: 4px; height: 4px; border-radius: 50%; background: #f6c65b; box-shadow: 0 0 10px 3px rgba(224, 86, 52, 0.7); animation: leave-ember 4s calc(var(--i) * -0.33s) ease-in infinite; }
+@keyframes leave-overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes leave-panel-in { from { opacity: 0; transform: translateY(35px) scale(0.88) rotateX(8deg); } to { opacity: 1; transform: translateY(0) scale(1) rotateX(0); } }
+@keyframes leave-rune-spin { to { transform: rotate(360deg); } }
+@keyframes leave-sigil-pulse { 0%, 100% { box-shadow: 0 0 4px rgba(246, 198, 91, 0.2); } 50% { box-shadow: 0 0 22px rgba(246, 198, 91, 0.65); } }
+@keyframes leave-ember { 0% { opacity: 0; transform: translateY(0) scale(0.5); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(-88vh) translateX(34px) scale(1.4); } }
+@media (prefers-reduced-motion: reduce) {
+  .leave-game-overlay *, .leave-game-overlay::before, .leave-game-overlay::after { animation-duration: 0.01s !important; animation-iteration-count: 1 !important; }
+}
+
 /* ----- Bottom right: minimap ----- */
 .hud-bottom-right {
   position: absolute;

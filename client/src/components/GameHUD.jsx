@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useT } from '../i18n/index.js';
 import { HeroCard } from './HeroCard.jsx';
 import { SkillBar } from './SkillBar.jsx';
@@ -6,6 +6,7 @@ import '../styles/HUD.css';
 
 export function GameHUD({ players, currentPlayerId, roomCode, currentMap, getScene, onLeaveRoom }) {
   const t = useT();
+  const [showLeavePrompt, setShowLeavePrompt] = useState(false);
   const minimapRef = useRef(null);
   const currentPlayer = players.find((p) => p.id === currentPlayerId);
 
@@ -26,7 +27,7 @@ export function GameHUD({ players, currentPlayerId, roomCode, currentMap, getSce
           <span className="label">{t('hud.room')}</span>
           <span className="value">{roomCode}</span>
         </div>
-        <button className="hud-btn leave-btn" onClick={onLeaveRoom}>
+        <button className="hud-btn leave-btn" onClick={() => setShowLeavePrompt(true)}>
           ← {t('hud.leave')}
         </button>
       </div>
@@ -50,6 +51,24 @@ export function GameHUD({ players, currentPlayerId, roomCode, currentMap, getSce
           </div>
         </div>
       </div>
+
+      {showLeavePrompt && (
+        <div className="leave-game-overlay" role="dialog" aria-modal="true" aria-labelledby="leave-game-title">
+          <div className="leave-game-embers" aria-hidden="true">
+            {Array.from({ length: 12 }, (_, i) => <i key={i} style={{ '--i': i }} />)}
+          </div>
+          <div className="leave-game-panel">
+            <div className="leave-game-sigil" aria-hidden="true"><span>↜</span><b>!</b><span>↝</span></div>
+            <div className="leave-game-rule" />
+            <h2 id="leave-game-title">{t('hud.leaveTitle')}</h2>
+            <p>{t('hud.leaveMessage')}</p>
+            <div className="leave-game-actions">
+              <button className="hud-btn" onClick={() => setShowLeavePrompt(false)}>{t('hud.leaveStay')}</button>
+              <button className="hud-btn leave-confirm-btn" onClick={onLeaveRoom}>{t('hud.leaveConfirm')}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
