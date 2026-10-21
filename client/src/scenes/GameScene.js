@@ -26,12 +26,12 @@ import { translate } from '../i18n/index.js';
 import walkingWaterSound from '../music/effect/vfx/walking-water.mp3';
 
 const UNIT_SCALE = 0.25; // characters are drawn at 0.25x relative to the map; scales character-attached helpers
-const MOVE_SPEED = 45 * UNIT_SCALE; // units per second
-const MOVE_ACCELERATION = 18; // smooths start/stop without making the character feel sluggish
-const MOVE_DECELERATION = 26;
+// Arcade movement: reach full speed immediately and stop immediately when the key is released.
+// The previous acceleration/deceleration made short taps feel like pushing a heavy character.
+const MOVE_SPEED = 60 * UNIT_SCALE; // units per second
 const CAMERA_FOV = 60;
 const CAMERA_OFFSET = new THREE.Vector3(23, 35, 35); // follow-camera offset from the focus point
-const CAMERA_FOLLOW_SMOOTHING = 8; // higher = camera catches up faster
+const CAMERA_FOLLOW_SMOOTHING = 14; // keep the follow camera snappy with the faster movement
 const CAMERA_ROTATE_SENSITIVITY = 0.008;
 const CAMERA_MIN_PITCH = THREE.MathUtils.degToRad(25);
 const CAMERA_MAX_PITCH = THREE.MathUtils.degToRad(78);
@@ -42,7 +42,7 @@ const CAMERA_ZOOM_SMOOTHING = 12;
 const DEFAULT_ARENA_SIZE = 500;
 const NETWORK_SYNC_INTERVAL = 0.05; // seconds between position broadcasts (20Hz)
 const MOVE_EPSILON_SQ = 0.0005; // squared distance threshold to consider a remote player "moving"
-const REMOTE_POSITION_SMOOTHING = 14; // higher = remote players catch up to their network position faster
+const REMOTE_POSITION_SMOOTHING = 20; // higher = remote players catch up to their network position faster
 const REMOTE_SNAP_DISTANCE_SQ = 30 * 30; // farther than this (teleport) skips the smoothing
 const REMOTE_IDLE_TIMEOUT_MS = 200; // remote player is idle if no movement update arrived within this time
 const SEND_LOCK_MS = 120; // minimum gap between two action requests from the local player
@@ -1016,11 +1016,9 @@ export class GameScene {
     if (moveDir.lengthSq() > 0) {
       moveDir.normalize();
       const desiredVelocity = moveDir.multiplyScalar(MOVE_SPEED);
-      const blend = 1 - Math.exp(-MOVE_ACCELERATION * delta);
-      player.moveVelocity.lerp(desiredVelocity, blend);
+      player.moveVelocity.copy(desiredVelocity);
     } else {
-      const blend = 1 - Math.exp(-MOVE_DECELERATION * delta);
-      player.moveVelocity.lerp(new THREE.Vector3(), blend);
+      player.moveVelocity.set(0, 0, 0);
     }
 
     if (player.moveVelocity.lengthSq() < 0.0004) {
@@ -1174,6 +1172,13 @@ export class GameScene {
     const now = performance.now();
 
     if (caster) {
+      // The server deducts the mana before broadcasting this event. Keep the
+      // scene's local player data in sync immediately so the HUD and the
+      // client-side mana guard do not continue using the old value until the
+      // next regeneration tick.
+      const serverCaster = event.players?.find((player) => player.id === event.casterId);
+      if (serverCaster) caster.data = { ...caster.data, ...serverCaster };
+
       const custom = event.skill || null;
       const def = custom ? getSkillAction(custom.skillId) : getActionDef(caster.role, event.slot);
       caster.model.rotation.y = Math.atan2(event.dir.x, event.dir.z);

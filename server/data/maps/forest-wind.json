@@ -1,0 +1,137 @@
+{
+  "id": "forest-wind",
+  "name": "forest wind",
+  "version": 1,
+  "size": 200,
+  "sky": "bright",
+  "weather": "clear",
+  "music": "none",
+  "createdAt": "2026-10-21T06:15:14.594Z",
+  "updatedAt": "2026-10-21T06:20:27.194Z",
+  "objects": [
+    {
+      "uid": "o-mvhpri90-fvet3",
+      "type": "custom:rock:hand-painted-platform-game-v2",
+      "position": {
+        "x": -15,
+        "y": 0,
+        "z": -85
+      },
+      "rotationY": 270,
+      "scale": 2.55,
+      "animation": null
+    },
+    {
+      "uid": "o-mvhpsq0z-6l6lt",
+      "type": "custom:rock:hand-painted-platform-game-v2",
+      "position": {
+        "x": 5,
+        "y": 0,
+        "z": -85
+      },
+      "rotationY": 0,
+      "scale": 2.55,
+      "animation": null
+    },
+    {
+      "uid": "o-mvhptrqc-a9gj0",
+      "type": "custom:default-towers:stylized-magic-tower",
+      "position": {
+        "x": -80,
+        "y": 0,
+        "z": -75
+      },
+      "rotationY": 60,
+      "scale": 1,
+      "animation": null,
+      "tower": true,
+      "team": "team1",
+      "main": false
+    },
+    {
+      "uid": "o-mvhpuw4h-r65uz",
+      "type": "custom:default-towers:temple-langlois",
+      "position": {
+        "x": -30,
+        "y": 0,
+        "z": -35
+      },
+      "rotationY": 45,
+      "scale": 1,
+      "animation": null,
+      "tower": true,
+      "team": "team1",
+      "main": true
+    },
+    {
+      "uid": "o-mvhpvq0w-j12ta",
+      "type": "custom:default-towers:rook-tower",
+      "position": {
+        "x": 85,
+        "y": 0,
+        "z": 85
+      },
+      "rotationY": 225,
+      "scale": 1,
+      "animation": null,
+      "tower": true,
+      "team": "team2",
+      "main": true
+    },
+    {
+      "uid": "o-mvhpvy1n-uq6xo",
+      "type": "custom:default-towers:magical-tower",
+      "position": {
+        "x": 50,
+        "y": 0,
+        "z": 50
+      },
+      "rotationY": 0,
+      "scale": 1,
+      "animation": null,
+      "tower": true,
+      "team": "team2",
+      "main": false
+    },
+    {
+      "uid": "o-mvhq0qms-qc3pa",
+      "type": "pattern:pattern1",
+      "position": {
+        "x": -75,
+        "y": 0,
+        "z": -25
+      },
+      "rotationY": 0,
+      "scale": 1,
+      "animation": null,
+      "noCollision": true
+    },
+    {
+      "uid": "o-mvhq0wr7-dziqj",
+      "type": "pattern:pattern2",
+      "position": {
+        "x": 30,
+        "y": 0,
+        "z": -70
+      },
+      "rotationY": 60,
+      "scale": 1,
+      "animation": null,
+      "noCollision": true
+    },
+    {
+      "uid": "o-mvhq16ej-fhc8y",
+      "type": "pattern:water-pattern",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 15
+      },
+      "rotationY": 120,
+      "scale": 1.75,
+      "animation": null,
+      "noCollision": true
+    }
+  ],
+  "paths": []
+}
