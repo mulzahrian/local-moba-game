@@ -7,7 +7,7 @@
   "weather": "clear",
   "music": "none",
   "createdAt": "2026-10-21T06:15:14.594Z",
-  "updatedAt": "2026-10-21T14:58:22.315Z",
+  "updatedAt": "2026-10-21T15:31:15.389Z",
   "objects": [
     {
       "uid": "o-mvhpri90-fvet3",
@@ -163,6 +163,90 @@
         "x": -25,
         "y": 0,
         "z": 15
+      },
+      "rotationY": 0,
+      "scale": 1.9,
+      "animation": null
+    },
+    {
+      "uid": "o-mvi9izdt-imv8s",
+      "type": "custom:default-trees:stylize-tree-lowpoly",
+      "position": {
+        "x": -85,
+        "y": 0,
+        "z": -15
+      },
+      "rotationY": 0,
+      "scale": 3.15,
+      "animation": null
+    },
+    {
+      "uid": "o-mvi9jbpe-302tk",
+      "type": "custom:default-trees:stylize-tree-lowpoly",
+      "position": {
+        "x": -90,
+        "y": 0,
+        "z": -5
+      },
+      "rotationY": 0,
+      "scale": 2.6,
+      "animation": null
+    },
+    {
+      "uid": "o-mvi9jo3d-14dcq",
+      "type": "custom:default-trees:stylize-tree-lowpoly",
+      "position": {
+        "x": -90,
+        "y": 0,
+        "z": -15
+      },
+      "rotationY": 0,
+      "scale": 2.75,
+      "animation": null
+    },
+    {
+      "uid": "o-mvi9k8nt-agmr9",
+      "type": "custom:default-trees:skeletal-tree-free",
+      "position": {
+        "x": 30,
+        "y": 0,
+        "z": -65
+      },
+      "rotationY": 30,
+      "scale": 2.4,
+      "animation": null
+    },
+    {
+      "uid": "o-mvi9nwr1-z3oy9",
+      "type": "custom:default-trees:stylize-tree-lowpoly",
+      "position": {
+        "x": -95,
+        "y": 0,
+        "z": 10
+      },
+      "rotationY": 0,
+      "scale": 2.6,
+      "animation": null
+    },
+    {
+      "uid": "o-mvi9o9s5-kq980",
+      "type": "custom:default-trees:stylize-tree-lowpoly",
+      "position": {
+        "x": -95,
+        "y": 0,
+        "z": 15
+      },
+      "rotationY": 0,
+      "scale": 2.6,
+      "animation": null
+    },
+    {
+      "uid": "o-mvi9ogfs-bue5q",
+      "type": "custom:default-trees:stylize-tree-lowpoly",
+      "position": {
+        "x": -90,
+        "y": 0,
+        "z": 20
       },
       "rotationY": 0,
       "scale": 1.9,

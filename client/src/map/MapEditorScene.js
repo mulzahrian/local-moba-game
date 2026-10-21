@@ -838,17 +838,14 @@ export class MapEditorScene {
       return;
     }
 
-    const uid = this.pickObject();
-
-    // While placing, clicking an existing object selects it instead (Shift+click places anyway).
+    // While placing, always place at the ground point.  Picking existing objects
+    // here made nearby models steal the click and unexpectedly cancel placement.
     if (this.placingType) {
-      if (uid && !event.shiftKey) {
-        this.setPlacingType(null);
-      } else {
-        if (point) this.placeAt(point);
-        return;
-      }
+      if (point) this.placeAt(point);
+      return;
     }
+
+    const uid = this.pickObject();
 
     const waypoint = uid ? null : this.pickWaypoint();
     if (waypoint) {
