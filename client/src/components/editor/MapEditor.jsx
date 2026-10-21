@@ -144,6 +144,7 @@ export function MapEditor({ mapId, onExit }) {
   const [gizmoMode, setGizmoMode] = useState('translate');
   const [gizmoSpace, setGizmoSpace] = useState('world');
   const [previewMap, setPreviewMap] = useState(null);
+  const [showLeavePrompt, setShowLeavePrompt] = useState(false);
   const previewRef = useRef(null);
   const previewGameRef = useRef(null);
   const [pickingCharacter, setPickingCharacter] = useState(false);
@@ -308,6 +309,18 @@ export function MapEditor({ mapId, onExit }) {
 
   useEffect(() => () => audioService.setTrack('menu'), []);
 
+  // Browsers show their own native warning when the user closes/reloads the page.
+  // The in-app Back button uses the themed dialog below instead.
+  useEffect(() => {
+    const onBeforeUnload = (event) => {
+      if (!dirty) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [dirty]);
+
   const save = async () => {
     const objectsToSave = scene().getObjects();
     const towerProblem = validateTowers(objectsToSave);
@@ -339,7 +352,12 @@ export function MapEditor({ mapId, onExit }) {
   };
 
   const exit = () => {
-    if (dirty && !window.confirm(t('editor.confirmLeave'))) return;
+    if (dirty) setShowLeavePrompt(true);
+    else onExit();
+  };
+
+  const confirmLeave = () => {
+    setShowLeavePrompt(false);
     onExit();
   };
 
@@ -791,6 +809,20 @@ export function MapEditor({ mapId, onExit }) {
             <div className="ce-pick-actions">
               <button className="ed-btn" onClick={() => setPickingCharacter(false)}>{t('common.cancel')}</button>
               <button className="ed-btn primary" disabled={!characterId} onClick={beginPreview}>? {t('pick.confirm')}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showLeavePrompt && (
+        <div className="editor-leave-overlay" role="dialog" aria-modal="true" aria-labelledby="editor-leave-title">
+          <div className="editor-leave-panel">
+            <div className="editor-leave-emblem" aria-hidden="true">!</div>
+            <h2 id="editor-leave-title">{t('editor.leaveTitle')}</h2>
+            <p>{t('editor.leaveMessage')}</p>
+            <div className="editor-leave-actions">
+              <button className="ed-btn" onClick={() => setShowLeavePrompt(false)}>{t('editor.leaveStay')}</button>
+              <button className="ed-btn danger" onClick={confirmLeave}>{t('editor.leaveConfirm')}</button>
             </div>
           </div>
         </div>
