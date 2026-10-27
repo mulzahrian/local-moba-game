@@ -66,6 +66,7 @@ export function CharacterEditor({ characterId, onExit }) {
   const [gltf, setGltf] = useState(null);
   const [modelState, setModelState] = useState(characterId ? 'loading' : 'empty'); // empty | loading | ready | error
   const [dirty, setDirty] = useState(false);
+  const [showLeavePrompt, setShowLeavePrompt] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState(null); // { type: 'ok' | 'error', text }
 
@@ -130,6 +131,17 @@ export function CharacterEditor({ characterId, onExit }) {
     const timer = setTimeout(() => setStatus(null), 3500);
     return () => clearTimeout(timer);
   }, [status]);
+
+  // Browsers show their own native warning when the user closes/reloads the page.
+  useEffect(() => {
+    const onBeforeUnload = (event) => {
+      if (!dirty) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [dirty]);
 
   // 3D preview, only alive while the animation step is open.
   useEffect(() => {
@@ -249,7 +261,12 @@ export function CharacterEditor({ characterId, onExit }) {
   };
 
   const exit = () => {
-    if (dirty && !window.confirm(t('char.confirmLeave'))) return;
+    if (dirty) setShowLeavePrompt(true);
+    else onExit();
+  };
+
+  const confirmLeave = () => {
+    setShowLeavePrompt(false);
     onExit();
   };
 
@@ -350,6 +367,19 @@ export function CharacterEditor({ characterId, onExit }) {
             </button>
           </div>
         </div>
+        {showLeavePrompt && (
+          <div className="editor-leave-overlay" role="dialog" aria-modal="true" aria-labelledby="character-leave-title">
+            <div className="editor-leave-panel">
+              <div className="editor-leave-emblem" aria-hidden="true">!</div>
+              <h2 id="character-leave-title">{t('char.leaveTitle')}</h2>
+              <p>{t('char.leaveMessage')}</p>
+              <div className="editor-leave-actions">
+                <button className="ed-btn" onClick={() => setShowLeavePrompt(false)}>{t('char.leaveStay')}</button>
+                <button className="ed-btn danger" onClick={confirmLeave}>{t('char.leaveConfirm')}</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -459,6 +489,20 @@ export function CharacterEditor({ characterId, onExit }) {
           </div>
         </aside>
       </div>
+
+      {showLeavePrompt && (
+        <div className="editor-leave-overlay" role="dialog" aria-modal="true" aria-labelledby="character-leave-title">
+          <div className="editor-leave-panel">
+            <div className="editor-leave-emblem" aria-hidden="true">!</div>
+            <h2 id="character-leave-title">{t('char.leaveTitle')}</h2>
+            <p>{t('char.leaveMessage')}</p>
+            <div className="editor-leave-actions">
+              <button className="ed-btn" onClick={() => setShowLeavePrompt(false)}>{t('char.leaveStay')}</button>
+              <button className="ed-btn danger" onClick={confirmLeave}>{t('char.leaveConfirm')}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
