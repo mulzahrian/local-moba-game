@@ -3,11 +3,9 @@ import { listCharacters } from '../../character/characterAssets.js';
 import { useT } from '../../i18n/index.js';
 import { CharacterAvatar } from './CharacterAvatar.jsx';
 import { CharacterIdlePreview } from './CharacterIdlePreview.jsx';
-import { RoleSkills } from './RoleSkills.jsx';
 import '../../styles/Character.css';
 
-// Playable characters (the default hero plus everything made in the Character Generator): the list with
-// profile pictures on the left, the selected hero's 3D idle model on the right.
+// Playable characters (the default hero plus everything made in the Character Generator).
 export function CharacterPicker({ value, onChange }) {
   const t = useT();
   const [characters, setCharacters] = useState([]);
@@ -48,7 +46,7 @@ export function CharacterPicker({ value, onChange }) {
               className={`char-row ${character.id === value ? 'selected' : ''}`}
               onClick={() => onChange(character.id)}
             >
-              <CharacterAvatar character={character} size={48} />
+              <CharacterAvatar character={character} size={104} />
               <span className="char-row-info">
                 <span className="char-card-name">{character.name}</span>
                 <span className="char-card-role">
@@ -71,7 +69,6 @@ export function CharacterPicker({ value, onChange }) {
           )}
         </div>
       </div>
-      {selected && <RoleSkills role={selected.role} />}
     </div>
   );
 }

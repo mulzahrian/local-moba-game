@@ -14,7 +14,7 @@ export function PlayView({ onNavigate }) {
 
   return (
     <div
-      className="menu-panel character-select-panel"
+      className="menu-panel character-select-panel hero-select-panel"
       style={{ backgroundImage: `linear-gradient(rgba(10, 6, 3, 0.46), rgba(10, 6, 3, 0.82)), url(${characterSelectBackground})` }}
     >
       <h2 className="panel-title">{t('play.title')}</h2>
