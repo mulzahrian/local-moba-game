@@ -18,6 +18,7 @@ import { ensureSkillLibrary, getSkill, getSkillAction, refreshSkillLibrary } fro
 import { SKILL_SOUND_EFFECT } from '../skill/skillEffects.js';
 import { SUMMON_SOUND_EFFECT } from '../skill/summonEffects.js';
 import { getMonsterDefinition } from '../monster/monsterAssets.js';
+import { getMinionDefinition } from '../minion/minionAssets.js';
 import { WorldActor } from '../world/WorldActor.js';
 import '../character/towerEffects.js';
 import { useSkillStore } from '../store/skillStore.js';
@@ -519,12 +520,13 @@ export class GameScene {
   async addUnit(data) {
     if (this.units.has(data.id)) return;
     try {
-      await ensureSkillLibrary();
-      const findUnit = () => getSkill(data.skillId)?.units?.find((candidate) => candidate.id === data.unitId);
-      let unit = findUnit();
-      if (!unit) {
-        await refreshSkillLibrary(); // the skill may have been made after this client loaded the library
+      let unit;
+      if (data.minionId) unit = await getMinionDefinition(data.minionId);
+      else {
+        await ensureSkillLibrary();
+        const findUnit = () => getSkill(data.skillId)?.units?.find((candidate) => candidate.id === data.unitId);
         unit = findUnit();
+        if (!unit) { await refreshSkillLibrary(); unit = findUnit(); }
       }
       if (!unit?.modelUrl) return;
       const gltf = await loadGltf(unit.modelUrl);
@@ -560,7 +562,7 @@ export class GameScene {
       states.forEach((state) => {
         const actor = actors.get(state.id);
         if (actor) actor.setState(state);
-        else this.pendingStates.set(state.id, state);
+        else { this.pendingStates.set(state.id, state); if (actors === this.units && state.minionId) this.addUnit(state); }
       });
     });
   }

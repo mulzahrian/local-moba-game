@@ -16,6 +16,7 @@ import objectStore from './managers/ObjectStore.js';
 import { installDefaultObjects } from './managers/DefaultObjects.js';
 import skillStore from './managers/SkillStore.js';
 import monsterStore from './managers/MonsterStore.js';
+import minionStore from './managers/MinionStore.js';
 import { isMonsterObject, monsterIdOfType } from '../shared/monsterConfig.js';
 import { setLoadout } from './managers/loadouts.js';
 import { sanitizeTeamSize } from '../shared/matchConfig.js';
@@ -417,6 +418,15 @@ app.get('/api/monsters', async (req, res) => {
   }
 });
 
+const withMinionVersion = (minion) => ({ ...minion, version: minion.updatedAt });
+app.get('/api/minions', async (req, res) => res.json({ success: true, minions: (await minionStore.list()).map(withMinionVersion) }));
+app.get('/api/minions/:id', async (req, res) => { const minion = await minionStore.get(req.params.id); if (!minion) return notFound(res, 'Minion'); res.json({ success: true, minion: withMinionVersion(minion) }); });
+app.post('/api/minions', async (req, res) => res.status(201).json({ success: true, minion: withMinionVersion(await minionStore.create(req.body)) }));
+app.put('/api/minions/:id', async (req, res) => { const minion = await minionStore.update(req.params.id, req.body); if (!minion) return notFound(res, 'Minion'); res.json({ success: true, minion: withMinionVersion(minion) }); });
+app.delete('/api/minions/:id', async (req, res) => { if (!(await minionStore.remove(req.params.id))) return notFound(res, 'Minion'); res.json({ success: true }); });
+app.put('/api/minions/:id/model', express.raw({ type: () => true, limit: MAX_MODEL_BYTES }), async (req, res) => { if (!Buffer.isBuffer(req.body) || !isGlb(req.body)) return res.status(400).json({ success: false, message: 'File must be a .glb model' }); const minion = await minionStore.saveModel(req.params.id, req.body); if (!minion) return notFound(res, 'Minion'); res.json({ success: true, minion: withMinionVersion(minion) }); });
+app.get('/api/minions/:id/model', async (req, res) => { const minion = await minionStore.get(req.params.id); if (!minion?.hasModel) return notFound(res, 'Model'); res.type('model/gltf-binary').sendFile(minionStore.modelPath(minion.id)); });
+
 app.get('/api/monsters/:id', async (req, res) => {
   try {
     const monster = await monsterStore.get(req.params.id);
@@ -535,7 +545,8 @@ io.on('connection', (socket) => {
         teamSize: sanitizeTeamSize(data.teamSize),
         singlePlayer,
         botCharacters: singlePlayer ? await listBotCharacters() : [],
-        monsterDefs: await loadMapMonsters(map)
+        monsterDefs: await loadMapMonsters(map),
+        minionDefs: await minionStore.getMany()
       });
         
       if (room) {
@@ -785,6 +796,9 @@ await skillStore.seedSummonDefaults().catch((error) => {
 });
 await monsterStore.seedDefaults().catch((error) => {
   console.error('[Monsters] Could not install the default monsters:', error);
+});
+await minionStore.seedDefaults().catch((error) => {
+  console.error('[Minions] Could not install the default minion:', error);
 });
 
 const PORT = process.env.PORT || 3001;

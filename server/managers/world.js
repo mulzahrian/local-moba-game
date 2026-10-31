@@ -3,6 +3,7 @@ import { LEASH_FACTOR } from '../../shared/monsterConfig.js';
 import { getArenaLimit } from './combat.js';
 import { hurt, publicMonster, publicUnit } from './entities.js';
 import { tickTowers } from './towers.js';
+import { MINION_COUNT_PER_TEAM } from '../../shared/minionConfig.js';
 
 // Server-side behaviour of the entities in a room: monsters guard their spot and attack heroes that come
 // close; summoned units follow their owner and fight (or heal / restore mana for) their team.
@@ -21,6 +22,7 @@ const UNIT_MONSTER_RANGE = 15; // monsters are only fought when they are this cl
 const FOLLOW_DISTANCE = 6;
 const TELEPORT_DISTANCE = 60; // units left this far behind are brought back to their owner
 const MONSTER_UNIT_AGGRO = 0.75; // monsters notice units a bit later than heroes
+const MINION_AGGRO_RANGE = 22;
 
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const clamp = (value, limit) => Math.min(Math.max(value, -limit), limit);
@@ -252,6 +254,49 @@ function tickUnit(room, gm, unit, dt, now, limit) {
   return undefined;
 }
 
+function tickMinion(room, gm, unit, dt, now, limit) {
+  unit.moving = false;
+  const candidates = [
+    ...room.players.filter((p) => p.team !== unit.team && visible(p, now)).map((entity) => ({ kind: 'player', entity })),
+    ...room.units.filter((candidate) => candidate.minion && candidate.team !== unit.team && !candidate.dead).map((entity) => ({ kind: 'unit', entity }))
+  ].filter(({ entity }) => distance(entity.position, unit.position) <= MINION_AGGRO_RANGE);
+  const found = nearest(candidates, unit.position);
+
+  // Minions advance toward the enemy base when nobody is close enough to fight.
+  if (!found) {
+    const enemyTower = room.towers.find((tower) => tower.team !== unit.team && tower.main) || room.towers.find((tower) => tower.team !== unit.team);
+    if (!enemyTower) return;
+    const laneX = enemyTower.position.x - unit.home.x;
+    const laneZ = enemyTower.position.z - unit.home.z;
+    const laneLength = Math.hypot(laneX, laneZ) || 1;
+    const slotOffset = (unit.laneIndex - 1.5) * 3;
+    const lanePoint = {
+      x: enemyTower.position.x + (-laneZ / laneLength) * slotOffset,
+      z: enemyTower.position.z + (laneX / laneLength) * slotOffset
+    };
+    unit.moving = stepToward(unit, lanePoint, unit.speed, dt, limit) > 0;
+    return;
+  }
+
+  const target = found.entity;
+  const targetRadius = found.kind === 'player' ? HIT_RADIUS : target.radius;
+  // Each minion receives a different slot around the target instead of walking
+  // to the exact same point. This prevents the four units from piling up.
+  const angle = ((unit.laneIndex || 0) / MINION_COUNT_PER_TEAM) * Math.PI * 2 + (unit.team === 'team2' ? Math.PI : 0);
+  const formationRadius = Math.max(unit.range * 0.8, 2.4) + targetRadius;
+  const attackPoint = {
+    x: target.position.x + Math.cos(angle) * formationRadius,
+    z: target.position.z + Math.sin(angle) * formationRadius
+  };
+  const distanceToTarget = distance(unit.position, target.position);
+  const gap = distance(unit.position, attackPoint);
+  if (distanceToTarget > unit.range + targetRadius || gap > 1.1) {
+    unit.moving = stepToward(unit, attackPoint, unit.speed, dt, limit) > 0;
+  } else if (now >= unit.nextAttackAt) {
+    unitStrike(room, gm, unit, target, found.kind, now);
+  }
+}
+
 // ---------------------------------------------------------------------------
 
 /** Advances every monster and unit of the room by `dt` seconds and broadcasts what moved. */
@@ -263,7 +308,7 @@ export function tickWorld(room, gm, dt, now = Date.now()) {
 
   room.monsters.forEach((monster) => tickMonster(room, gm, monster, dt, now, limit));
   [...room.units].forEach((unit) => {
-    if (!unit.dead) tickUnit(room, gm, unit, dt, now, limit);
+    if (!unit.dead) unit.minion ? tickMinion(room, gm, unit, dt, now, limit) : tickUnit(room, gm, unit, dt, now, limit);
   });
 
   // only entities whose position, facing, motion or health changed are sent
@@ -275,7 +320,7 @@ export function tickWorld(room, gm, dt, now = Date.now()) {
         const key = `${state.x.toFixed(2)},${state.z.toFixed(2)},${state.r.toFixed(2)},${state.m},${Math.round(state.h)}`;
         if (entity.sentState === key) return [];
         entity.sentState = key;
-        return [{ id: state.id, x: state.x, z: state.z, r: state.r, m: state.m, h: state.h }];
+        return [{ id: state.id, x: state.x, z: state.z, r: state.r, m: state.m, h: state.h, ...(state.minionId ? { minionId: state.minionId, team: state.team, maxHealth: state.maxHealth } : {}) }];
       });
   const monsters = changedStates(room.monsters, publicMonster);
   const units = changedStates(room.units, publicUnit);

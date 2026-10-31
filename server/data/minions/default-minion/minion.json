@@ -1,0 +1,23 @@
+{
+  "id": "default-minion",
+  "name": "Default Minion",
+  "movement": "run",
+  "animations": {
+    "idle": "lml_anim_idle",
+    "run": "lml_anim_run",
+    "attack1": "lml_anim_atk01",
+    "attack2": "lml_anim_atk01",
+    "dead": "lml_anim_die"
+  },
+  "params": {
+    "scale": 1,
+    "health": 120,
+    "damage": 8,
+    "speed": 5,
+    "attackRange": 3,
+    "attackCooldown": 1.5
+  },
+  "hasModel": true,
+  "createdAt": "2026-10-31T04:40:30.857Z",
+  "updatedAt": "2026-10-31T04:40:30.867Z"
+}

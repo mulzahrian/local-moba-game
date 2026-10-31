@@ -7,6 +7,7 @@ import { createMonsters, publicUnit, unitRadius } from './entities.js';
 import { getSkillDef } from './loadouts.js';
 import { WORLD_TICK_MS, tickWorld } from './world.js';
 import { isSkillSlot, skillIdOfSlot } from '../../shared/skillConfig.js';
+import { MINION_COUNT_PER_TEAM, MINION_RESPAWNS } from '../../shared/minionConfig.js';
 
 // Builds a fresh in-room player for the chosen character (role decides health and mana pools).
 function createPlayer(id, name, team, slot, position, character, isBot = false) {
@@ -102,6 +103,22 @@ class GameManager {
     unit.dead = true;
     room.units = room.units.filter((candidate) => candidate !== unit);
     this.io.to(room.code).emit('entityDied', { kind: 'unit', id: unit.id, reason });
+    if (unit.minion && reason === 'killed' && unit.respawnsLeft > 0) {
+      unit.respawnsLeft -= 1;
+      unit.respawnAt = Date.now() + 10000;
+      setTimeout(() => {
+        const currentRoom = this.rooms.get(room.code);
+        if (!currentRoom || currentRoom.gameState !== 'in_progress') return;
+        unit.dead = false;
+        unit.health = unit.maxHealth;
+        unit.position = { ...unit.home };
+        unit.nextAttackAt = Date.now() + 1000;
+        unit.respawnAt = 0;
+        unit.sentState = null;
+        currentRoom.units.push(unit);
+        this.io.to(room.code).emit('unitRespawned', { unit: publicUnit(unit), delay: 10, respawnsLeft: unit.respawnsLeft });
+      }, 10000);
+    }
   }
 
   // Spawns the units of a necromancer / summoner / support skill next to the caster, replacing the ones
@@ -146,6 +163,26 @@ class GameManager {
       return entity;
     });
     return spawned.map(publicUnit);
+  }
+
+  spawnMinions(room, defs) {
+    const pool = [...defs.values()];
+    if (!pool.length) return;
+    for (const team of ['team1', 'team2']) {
+      const shuffled = [...pool].sort(() => Math.random() - 0.5);
+      const tower = getTowerForTeam(room.towers, team);
+      const enemyTower = room.towers.find((candidate) => candidate.team !== team && candidate.main) || room.towers.find((candidate) => candidate.team !== team);
+      const laneX = (enemyTower?.position.x || 0) - tower.position.x;
+      const laneZ = (enemyTower?.position.z || 0) - tower.position.z;
+      const laneLength = Math.hypot(laneX, laneZ) || 1;
+      const perpendicular = { x: -laneZ / laneLength, z: laneX / laneLength };
+      for (let i = 0; i < MINION_COUNT_PER_TEAM; i += 1) {
+        const def = shuffled[i % shuffled.length];
+        const offset = (i - 1.5) * 3;
+        const spawnPosition = { x: tower.position.x + perpendicular.x * offset, z: tower.position.z + perpendicular.z * offset };
+        room.units.push({ id: `minion-${++this.unitCounter}`, minion: true, minionId: def.id, laneIndex: i, team, ownerId: null, skillId: null, unitId: null, movement: def.movement, scale: def.params.scale, radius: Math.max(0.8, def.params.scale), position: spawnPosition, rotationY: 0, speed: def.params.speed, range: def.params.attackRange, cooldown: def.params.attackCooldown, amount: def.params.damage, health: def.params.health, maxHealth: def.params.health, nextAttackAt: Date.now() + 1000, stunUntil: 0, moving: false, dead: false, respawnsLeft: MINION_RESPAWNS, respawnAt: 0, home: { ...spawnPosition } });
+      }
+    }
   }
 
   hasHumans(room) {
@@ -344,6 +381,7 @@ class GameManager {
       maxPlayers: teamSize * 2,
       singlePlayer: Boolean(options.singlePlayer) // the other places are filled with computer players
     };
+    this.spawnMinions(room, options.minionDefs || new Map());
 
     this.addPlayer(room, hostId, hostName, character);
     if (room.singlePlayer) {

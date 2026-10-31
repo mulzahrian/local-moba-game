@@ -64,6 +64,7 @@ export const publicUnit = (unit) => ({
   team: unit.team,
   skillId: unit.skillId,
   unitId: unit.unitId,
+  minionId: unit.minionId || null,
   x: unit.position.x,
   z: unit.position.z,
   r: unit.rotationY,

@@ -103,7 +103,7 @@ export function MenuScreen({ onCreateRoom, onJoinRoom }) {
 
   return (
     <MenuBackdrop
-      wide={['play', 'map-objects', 'map-monsters', 'skills'].includes(view)}
+      wide={['play', 'map-objects', 'map-monsters', 'characters', 'skills'].includes(view)}
       showCharacter={view === 'main'}
     >
       {content}

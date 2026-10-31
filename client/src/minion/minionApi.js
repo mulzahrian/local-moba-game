@@ -1,0 +1,6 @@
+import { getServerUrl } from '../config/server.js';
+const BASE = `${getServerUrl()}/api/minions`;
+async function request(url, options = {}) { const r = await fetch(url, { ...options, headers: { ...(typeof options.body === 'string' ? { 'Content-Type': 'application/json' } : {}), ...options.headers } }); const d = await r.json().catch(() => ({})); if (!r.ok || d.success === false) throw new Error(d.message || `Request failed (${r.status})`); return d; }
+const enc = encodeURIComponent;
+const withUrls = (m) => ({ ...m, modelUrl: m.hasModel ? `${BASE}/${enc(m.id)}/model?v=${enc(m.version || m.updatedAt || '')}` : null });
+export const minionApi = { list: async () => (await request(BASE)).minions.map(withUrls), get: async (id) => withUrls((await request(`${BASE}/${enc(id)}`)).minion), create: async (m) => withUrls((await request(BASE, { method: 'POST', body: JSON.stringify(m) })).minion), update: async (id, m) => withUrls((await request(`${BASE}/${enc(id)}`, { method: 'PUT', body: JSON.stringify(m) })).minion), remove: (id) => request(`${BASE}/${enc(id)}`, { method: 'DELETE' }), uploadModel: async (id, file) => withUrls((await request(`${BASE}/${enc(id)}/model`, { method: 'PUT', body: file, headers: { 'Content-Type': 'application/octet-stream' } })).minion) };
