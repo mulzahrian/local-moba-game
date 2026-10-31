@@ -34,6 +34,7 @@
   box-sizing: border-box;
   max-height: calc(96vh - 150px);
   padding: 26px 30px 22px;
+  scrollbar-gutter: stable;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
