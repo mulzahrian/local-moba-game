@@ -252,6 +252,15 @@ function tickUnit(room, gm, unit, dt, now, limit) {
   return undefined;
 }
 
+function tickMinion(room, gm, unit, dt, now, limit) {
+  unit.moving = false;
+  const found = nearest(room.players.filter((p) => p.team !== unit.team && visible(p, now)).map((entity) => ({ kind: 'player', entity })), unit.position);
+  if (!found) { unit.moving = stepToward(unit, unit.home, unit.speed, dt, limit) > 0; return; }
+  const gap = found.d - HIT_RADIUS - unit.radius * 0.5;
+  if (gap > unit.range * STAND_OFF) unit.moving = stepToward(unit, found.entity.position, unit.speed, dt, limit) > 0;
+  else if (now >= unit.nextAttackAt) unitStrike(room, gm, unit, found.entity, 'player', now);
+}
+
 // ---------------------------------------------------------------------------
 
 /** Advances every monster and unit of the room by `dt` seconds and broadcasts what moved. */
@@ -263,7 +272,7 @@ export function tickWorld(room, gm, dt, now = Date.now()) {
 
   room.monsters.forEach((monster) => tickMonster(room, gm, monster, dt, now, limit));
   [...room.units].forEach((unit) => {
-    if (!unit.dead) tickUnit(room, gm, unit, dt, now, limit);
+    if (!unit.dead) unit.minion ? tickMinion(room, gm, unit, dt, now, limit) : tickUnit(room, gm, unit, dt, now, limit);
   });
 
   // only entities whose position, facing, motion or health changed are sent
@@ -275,7 +284,7 @@ export function tickWorld(room, gm, dt, now = Date.now()) {
         const key = `${state.x.toFixed(2)},${state.z.toFixed(2)},${state.r.toFixed(2)},${state.m},${Math.round(state.h)}`;
         if (entity.sentState === key) return [];
         entity.sentState = key;
-        return [{ id: state.id, x: state.x, z: state.z, r: state.r, m: state.m, h: state.h }];
+        return [{ id: state.id, x: state.x, z: state.z, r: state.r, m: state.m, h: state.h, ...(state.minionId ? { minionId: state.minionId, team: state.team, maxHealth: state.maxHealth } : {}) }];
       });
   const monsters = changedStates(room.monsters, publicMonster);
   const units = changedStates(room.units, publicUnit);

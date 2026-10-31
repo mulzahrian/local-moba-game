@@ -5,12 +5,14 @@ import { useT } from '../../i18n/index.js';
 import { CharacterAvatar } from '../character/CharacterAvatar.jsx';
 import '../../styles/Character.css';
 import characterSelectBackground from '../../public/img/char-select.png';
+import { MinionGeneratorView } from './MinionGeneratorView.jsx';
 
 export function CharacterListView({ onBack, onEdit }) {
   const t = useT();
   const [characters, setCharacters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [tab, setTab] = useState('characters');
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -41,11 +43,13 @@ export function CharacterListView({ onBack, onEdit }) {
   };
 
   return (
+    tab === 'minions' ? <MinionGeneratorView onBack={onBack} /> :
     <div
       className="menu-panel wide character-select-panel"
       style={{ backgroundImage: `linear-gradient(rgba(10, 6, 3, 0.5), rgba(10, 6, 3, 0.88)), url(${characterSelectBackground})` }}
     >
       <h2 className="panel-title">{t('chars.title')}</h2>
+      <div className="toggle-group map-tabs"><button className="toggle-btn active">{t('menu.characterGenerator')}</button><button className="toggle-btn" onClick={() => setTab('minions')}>Minion Generator</button></div>
 
       <div className="map-pick-list">
         {loading && <p className="hint">{t('common.loading')}</p>}
