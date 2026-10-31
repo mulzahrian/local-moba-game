@@ -597,8 +597,8 @@ export class GameScene {
       attacker.attack(event.slot || 'attack1', to.x, to.z);
       const from = attacker.group.position;
       const volume = this.soundVolume(from);
-      if (event.effect) {
-        this.effects.spawn(event.effect, {
+      if (event.effect || event.attackType) {
+        this.effects.spawn(event.effect || attackEffectId(event.attackType || 'sword', event.slot || 'attack1'), {
           position: from,
           rotationY: Math.atan2(to.x - from.x, to.z - from.z),
           range: Math.hypot(to.x - from.x, to.z - from.z),

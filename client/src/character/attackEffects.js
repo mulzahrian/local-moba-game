@@ -131,7 +131,7 @@ const LABELS = {
 
 registerEffects(BUILDERS, LABELS);
 
-const ATTACK_EFFECT_PREFIX = { sword: 'attackSword', punch: 'attackPunch', shot: 'attackShot' };
+const ATTACK_EFFECT_PREFIX = { sword: 'attackSword', punch: 'attackPunch', shot: 'attackShot', arrow: 'attackShot' };
 
 /** Effect id of a basic attack: its attack type plus 1 (attack1) or 2 (attack2). */
 export function attackEffectId(attackType, slot) {
