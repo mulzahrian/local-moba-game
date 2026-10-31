@@ -171,10 +171,16 @@ class GameManager {
     for (const team of ['team1', 'team2']) {
       const shuffled = [...pool].sort(() => Math.random() - 0.5);
       const tower = getTowerForTeam(room.towers, team);
+      const enemyTower = room.towers.find((candidate) => candidate.team !== team && candidate.main) || room.towers.find((candidate) => candidate.team !== team);
+      const laneX = (enemyTower?.position.x || 0) - tower.position.x;
+      const laneZ = (enemyTower?.position.z || 0) - tower.position.z;
+      const laneLength = Math.hypot(laneX, laneZ) || 1;
+      const perpendicular = { x: -laneZ / laneLength, z: laneX / laneLength };
       for (let i = 0; i < MINION_COUNT_PER_TEAM; i += 1) {
         const def = shuffled[i % shuffled.length];
         const offset = (i - 1.5) * 3;
-        room.units.push({ id: `minion-${++this.unitCounter}`, minion: true, minionId: def.id, team, ownerId: null, skillId: null, unitId: null, movement: def.movement, scale: def.params.scale, radius: Math.max(0.8, def.params.scale), position: { x: tower.position.x + offset, z: tower.position.z + offset }, rotationY: 0, speed: def.params.speed, range: def.params.attackRange, cooldown: def.params.attackCooldown, amount: def.params.damage, health: def.params.health, maxHealth: def.params.health, nextAttackAt: Date.now() + 1000, stunUntil: 0, moving: false, dead: false, respawnsLeft: MINION_RESPAWNS, respawnAt: 0, home: { ...tower.position } });
+        const spawnPosition = { x: tower.position.x + perpendicular.x * offset, z: tower.position.z + perpendicular.z * offset };
+        room.units.push({ id: `minion-${++this.unitCounter}`, minion: true, minionId: def.id, laneIndex: i, team, ownerId: null, skillId: null, unitId: null, movement: def.movement, scale: def.params.scale, radius: Math.max(0.8, def.params.scale), position: spawnPosition, rotationY: 0, speed: def.params.speed, range: def.params.attackRange, cooldown: def.params.attackCooldown, amount: def.params.damage, health: def.params.health, maxHealth: def.params.health, nextAttackAt: Date.now() + 1000, stunUntil: 0, moving: false, dead: false, respawnsLeft: MINION_RESPAWNS, respawnAt: 0, home: { ...spawnPosition } });
       }
     }
   }
