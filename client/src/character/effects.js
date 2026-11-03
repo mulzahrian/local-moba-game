@@ -12,6 +12,40 @@ export const clamp01 = (v) => Math.min(1, Math.max(0, v));
 export const easeOut = (v) => 1 - (1 - clamp01(v)) ** 3;
 export const rand = (min, max) => min + Math.random() * (max - min);
 
+// Soft round glow so particles read as embers/sparks/smoke instead of hard square pixels.
+let softDotTexture = null;
+function getSoftDot() {
+  if (softDotTexture) return softDotTexture;
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.25, 'rgba(255,255,255,0.75)');
+  g.addColorStop(0.6, 'rgba(255,255,255,0.22)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  softDotTexture = new THREE.CanvasTexture(canvas);
+  return softDotTexture;
+}
+
+// Energy look: edges glow, the middle of a surface turns see-through. Removes the "solid plastic
+// polygon" feel of additive primitives (spheres, cones, torus) and gives soft volumetric depth.
+function addFresnelGlow(material, strength) {
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <opaque_fragment>',
+      `float fres = pow(1.0 - abs(dot(normalize(vNormal), normalize(vViewPosition))), 1.5);
+       diffuseColor.a *= mix(${strength.toFixed(2)}, 1.0, fres);
+       outgoingLight *= 0.75 + fres * 0.9;
+       #include <opaque_fragment>`
+    );
+  };
+  material.customProgramCacheKey = () => `fresnelGlow${strength}`;
+}
+
 export class Fx {
   constructor(duration) {
     this.duration = duration;
@@ -29,8 +63,7 @@ export class Fx {
 
   material(color, opacity = 0.9, additive = true) {
     const tint = new THREE.Color(color);
-    return this.track(
-      new THREE.MeshStandardMaterial({
+    const mat = new THREE.MeshStandardMaterial({
         color: tint,
         emissive: tint,
         emissiveIntensity: additive ? 1.35 : 0.18,
@@ -41,9 +74,9 @@ export class Fx {
         blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
         depthWrite: false,
         side: THREE.DoubleSide
-      }),
-      opacity
-    );
+      });
+    if (additive) addFresnelGlow(mat, 0.4);
+    return this.track(mat, opacity);
   }
 
   lineMaterial(color, opacity = 0.95) {
@@ -84,7 +117,8 @@ export class Fx {
     const material = this.track(
       new THREE.PointsMaterial({
         color,
-        size,
+        size: size * 1.7,
+        map: getSoftDot(),
         transparent: true,
         opacity: 0.9,
         depthWrite: false,
@@ -664,11 +698,166 @@ export function effectLabel(id, language) {
   return EFFECT_LABELS[id]?.[language] || EFFECT_LABELS[id]?.en || id;
 }
 
+// Soft radial scorch / crack decal texture, shared by every ground impact.
+let scorchTexture = null;
+function getScorchTexture() {
+  if (scorchTexture) return scorchTexture;
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.45, 'rgba(255,255,255,0.55)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 11; i++) {
+    const a = (i / 11) * TAU + Math.random() * 0.4;
+    let x = size / 2;
+    let y = size / 2;
+    ctx.lineWidth = 1 + Math.random() * 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    const len = size * (0.28 + Math.random() * 0.2);
+    for (let s = 1; s <= 4; s++) {
+      x += Math.cos(a + (Math.random() - 0.5) * 0.7) * (len / 4);
+      y += Math.sin(a + (Math.random() - 0.5) * 0.7) * (len / 4);
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  scorchTexture = new THREE.CanvasTexture(canvas);
+  return scorchTexture;
+}
+
+const GRAVITY = 14;
+
+/**
+ * Ground impact: a bright flash, expanding shockwave rings, a lingering scorch/crack decal, flying
+ * debris and a short light pulse. Lives in world space so it outlasts the effect that triggered it.
+ */
+class GroundImpact {
+  constructor(scene, { x, y, z, color, radius, power }) {
+    this.scene = scene;
+    this.time = 0;
+    this.duration = 1.5;
+    this.radius = radius;
+    this.power = power;
+    this.group = new THREE.Group();
+    this.group.position.set(x, y, z);
+    const tint = new THREE.Color(color);
+    const hot = tint.clone().lerp(new THREE.Color(0xffffff), 0.6);
+    const mat = (c, opacity, blending = THREE.AdditiveBlending, map = null) =>
+      new THREE.MeshBasicMaterial({ color: c, map, transparent: true, opacity, blending, depthWrite: false, side: THREE.DoubleSide });
+
+    this.flash = new THREE.Mesh(new THREE.CircleGeometry(1, 32), mat(hot, 1));
+    this.ringA = new THREE.Mesh(new THREE.TorusGeometry(1, 0.07, 8, 56), mat(hot, 1));
+    this.ringB = new THREE.Mesh(new THREE.RingGeometry(0.82, 1, 56), mat(tint, 0.7));
+    this.decal = new THREE.Mesh(new THREE.CircleGeometry(1, 32), mat(tint, 0.55, THREE.AdditiveBlending, getScorchTexture()));
+    this.dark = new THREE.Mesh(new THREE.CircleGeometry(1, 32), mat(0x050505, 0.4, THREE.NormalBlending, getScorchTexture()));
+    [this.flash, this.ringA, this.ringB, this.decal, this.dark].forEach((m, i) => {
+      m.rotation.x = -Math.PI / 2;
+      m.position.y = 0.04 + i * 0.006;
+      this.group.add(m);
+    });
+    this.dark.rotation.z = this.decal.rotation.z = rand(0, TAU);
+
+    this.debrisCount = Math.round(14 + power * 26);
+    this.debris = Array.from({ length: this.debrisCount }, () => {
+      const a = rand(0, TAU);
+      const speed = rand(0.4, 1) * radius * (2.2 + power);
+      return { x: 0, y: 0.1, z: 0, vx: Math.cos(a) * speed * 0.5, vy: rand(3, 6 + power * 5), vz: Math.sin(a) * speed * 0.5 };
+    });
+    const positions = new Float32Array(this.debrisCount * 3);
+    this.debrisGeometry = new THREE.BufferGeometry();
+    this.debrisGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    this.debrisMaterial = new THREE.PointsMaterial({ color: hot, size: 0.6, map: getSoftDot(), transparent: true, opacity: 1, depthWrite: false, blending: THREE.AdditiveBlending });
+    this.points = new THREE.Points(this.debrisGeometry, this.debrisMaterial);
+    this.points.frustumCulled = false;
+    this.group.add(this.points);
+
+    this.light = new THREE.PointLight(tint, 0, radius * 4, 2);
+    this.light.position.y = 1.2;
+    this.group.add(this.light);
+    scene.add(this.group);
+    this.update(0);
+  }
+
+  update(dt) {
+    this.time += dt;
+    const t = this.time;
+    const r = this.radius;
+    const p = this.power;
+    const fl = clamp01(t / 0.16);
+    this.flash.scale.setScalar(Math.max(0.01, r * 0.55 * easeOut(fl)));
+    this.flash.material.opacity = 1 - fl;
+    const wa = clamp01(t / 0.5);
+    this.ringA.scale.setScalar(Math.max(0.01, r * 1.15 * easeOut(wa)));
+    this.ringA.material.opacity = (1 - wa) ** 1.5;
+    const wb = clamp01((t - 0.06) / 0.65);
+    this.ringB.scale.setScalar(Math.max(0.01, r * 0.9 * easeOut(wb)));
+    this.ringB.material.opacity = 0.7 * (1 - wb) ** 1.5;
+    const grow = easeOut(clamp01(t / 0.25));
+    const fade = 1 - clamp01((t - 0.5) / (this.duration - 0.5));
+    this.decal.scale.setScalar(Math.max(0.01, r * 0.8 * grow));
+    this.decal.material.opacity = 0.55 * fade * (t < 0.3 ? 1 : 0.7);
+    this.dark.scale.setScalar(Math.max(0.01, r * 0.9 * grow));
+    this.dark.material.opacity = 0.4 * fade;
+
+    const pos = this.debrisGeometry.attributes.position.array;
+    this.debris.forEach((d, i) => {
+      d.vy -= GRAVITY * dt;
+      d.x += d.vx * dt;
+      d.z += d.vz * dt;
+      d.y = Math.max(0.05, d.y + d.vy * dt);
+      if (d.y <= 0.05) {
+        d.vy = 0;
+        d.vx *= 0.8;
+        d.vz *= 0.8;
+      }
+      pos[i * 3] = d.x;
+      pos[i * 3 + 1] = d.y;
+      pos[i * 3 + 2] = d.z;
+    });
+    this.debrisGeometry.attributes.position.needsUpdate = true;
+    this.debrisMaterial.opacity = 1 - clamp01((t - 0.5) / 0.6);
+    this.light.intensity = (1 - clamp01(t / 0.45)) ** 2 * (30 + 90 * p);
+  }
+
+  get done() {
+    return this.time >= this.duration;
+  }
+
+  dispose() {
+    this.group.traverse((c) => {
+      c.geometry?.dispose();
+      c.material?.dispose();
+    });
+    this.group.parent?.remove(this.group);
+  }
+}
+
+const firstColor = (fx) => {
+  const m = fx.materials.find((mat) => mat.color && !mat.isLineBasicMaterial) || fx.materials[0];
+  return m?.color ? m.color.getHex() : 0xffffff;
+};
+
+// Overshoot "pop" so effects burst out instead of just fading in.
+const popScale = (t) => {
+  const u = clamp01(t / 0.22);
+  return 0.82 + 0.18 * u + 0.1 * Math.sin(u * Math.PI);
+};
+
 /** Spawns, animates and disposes effects inside a Three.js scene. */
 export class EffectManager {
   constructor(scene) {
     this.scene = scene;
     this.active = [];
+    this.impacts = [];
+    this.onImpact = null; // (power, worldPosition) => void, e.g. camera shake
   }
 
   /**
@@ -683,15 +872,41 @@ export class EffectManager {
     fx.group.position.set(position.x, position.y || 0, position.z);
     fx.group.rotation.y = rotationY;
     this.scene.add(fx.group);
-    const entry = { fx, model, time: 0 };
+    const entry = { fx, model, time: 0, id, position: { x: position.x, y: position.y || 0, z: position.z }, rotationY, range, impactDone: false };
     this.active.push(entry);
     this.step(entry, 0);
+  }
+
+  spawnImpact(entry) {
+    const { fx, position, rotationY, range } = entry;
+    const spec = fx.impact === undefined ? {} : fx.impact;
+    if (spec === null || entry.id === 'none') return;
+    const lx = spec.x || 0;
+    const lz = spec.z || 0;
+    const cos = Math.cos(rotationY);
+    const sin = Math.sin(rotationY);
+    const power = spec.power ?? clamp01(range / 14) * 0.8 + 0.2;
+    const radius = spec.radius ?? Math.min(Math.max(range * 0.35, 1.8), 6);
+    this.impacts.push(new GroundImpact(this.scene, {
+      x: position.x + lx * cos + lz * sin,
+      y: position.y,
+      z: position.z - lx * sin + lz * cos,
+      color: spec.color ?? firstColor(fx),
+      radius,
+      power
+    }));
+    this.onImpact?.(power, position);
   }
 
   step(entry, dt) {
     const { fx } = entry;
     entry.time += dt;
     const t = entry.time;
+    if (!entry.impactDone && t >= (fx.impact?.t ?? 0)) {
+      entry.impactDone = true;
+      this.spawnImpact(entry);
+    }
+    fx.group.scale.setScalar(popScale(t));
     fx.tick(t, dt);
     const fadeIn = Math.min(1, t / 0.12);
     const fadeOut = Math.min(1, (fx.duration - t) / 0.35);
@@ -708,6 +923,13 @@ export class EffectManager {
         this.active.splice(i, 1);
       }
     }
+    for (let i = this.impacts.length - 1; i >= 0; i--) {
+      this.impacts[i].update(dt);
+      if (this.impacts[i].done) {
+        this.impacts[i].dispose();
+        this.impacts.splice(i, 1);
+      }
+    }
   }
 
   finish({ fx, model }) {
@@ -718,5 +940,7 @@ export class EffectManager {
   dispose() {
     this.active.forEach((entry) => this.finish(entry));
     this.active = [];
+    this.impacts.forEach((impact) => impact.dispose());
+    this.impacts = [];
   }
 }

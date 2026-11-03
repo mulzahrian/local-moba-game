@@ -98,6 +98,10 @@ export class GameScene {
     this.mapVersion = 0;
     this.startedAt = Date.now(); // the shop is open for the first minutes after this
     this.effects = new EffectManager(this.scene);
+    this.effects.onImpact = (power, pos) => {
+      const d = this.camera?.position ? this.camera.position.distanceTo(pos) : 0;
+      this.cameraShake = Math.min(0.45, this.cameraShake + power * 0.18 * Math.max(0.2, 1 - d / 60));
+    };
     this.floaters = []; // floating damage / heal numbers
     this.disposed = false;
 
