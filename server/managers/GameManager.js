@@ -180,7 +180,7 @@ class GameManager {
         const def = shuffled[i % shuffled.length];
         const offset = (i - 1.5) * 3;
         const spawnPosition = { x: tower.position.x + perpendicular.x * offset, z: tower.position.z + perpendicular.z * offset };
-        room.units.push({ id: `minion-${++this.unitCounter}`, minion: true, minionId: def.id, laneIndex: i, team, ownerId: null, skillId: null, unitId: null, movement: def.movement, scale: def.params.scale, radius: Math.max(0.8, def.params.scale), position: spawnPosition, rotationY: 0, speed: def.params.speed, range: def.params.attackRange, cooldown: def.params.attackCooldown, amount: def.params.damage, health: def.params.health, maxHealth: def.params.health, nextAttackAt: Date.now() + 1000, stunUntil: 0, moving: false, dead: false, respawnsLeft: MINION_RESPAWNS, respawnAt: 0, home: { ...spawnPosition } });
+        room.units.push({ id: `minion-${++this.unitCounter}`, minion: true, minionId: def.id, laneIndex: i, team, ownerId: null, skillId: null, unitId: null, movement: def.movement, attackType: def.attackType || 'sword', scale: def.params.scale, radius: Math.max(0.8, def.params.scale), position: spawnPosition, rotationY: 0, speed: def.params.speed, range: def.params.attackRange, cooldown: def.params.attackCooldown, amount: def.params.damage, health: def.params.health, maxHealth: def.params.health, nextAttackAt: Date.now() + 1000, stunUntil: 0, moving: false, dead: false, respawnsLeft: MINION_RESPAWNS, respawnAt: 0, home: { ...spawnPosition } });
       }
     }
   }

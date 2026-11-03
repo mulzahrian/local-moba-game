@@ -161,6 +161,7 @@ function unitAttackPayload(unit, extra) {
     slot: 'attack1',
     dir: { x: Math.sin(unit.rotationY), z: Math.cos(unit.rotationY) },
     effect: unit.effect,
+    attackType: unit.attackType,
     range: unit.range,
     ...extra
   };
@@ -320,7 +321,7 @@ export function tickWorld(room, gm, dt, now = Date.now()) {
         const key = `${state.x.toFixed(2)},${state.z.toFixed(2)},${state.r.toFixed(2)},${state.m},${Math.round(state.h)}`;
         if (entity.sentState === key) return [];
         entity.sentState = key;
-        return [{ id: state.id, x: state.x, z: state.z, r: state.r, m: state.m, h: state.h, ...(state.minionId ? { minionId: state.minionId, team: state.team, maxHealth: state.maxHealth } : {}) }];
+        return [{ id: state.id, x: state.x, z: state.z, r: state.r, m: state.m, h: state.h, ...(state.minionId ? { minionId: state.minionId, team: state.team, maxHealth: state.maxHealth, attackType: state.attackType } : {}) }];
       });
   const monsters = changedStates(room.monsters, publicMonster);
   const units = changedStates(room.units, publicUnit);

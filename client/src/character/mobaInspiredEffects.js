@@ -30,6 +30,7 @@ function astralBlade({ range }) {
 function infernoComet({ range }) {
   const length = Math.min(Math.max(range, 8), 30);
   const fx = new Fx(1.35);
+  fx.impact = { t: 0.52, z: length, power: 1, radius: Math.min(8, Math.max(2.5, length * 0.18)), color: 0xff8a2a };
   const body = fx.add(new THREE.Mesh(new THREE.DodecahedronGeometry(0.7, 1), fx.material(0x54221c, 0.98, false)));
   const core = fx.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.42, 1), fx.material(0xffe2a0, 0.98)));
   const plume = fx.add(new THREE.Mesh(new THREE.ConeGeometry(0.55, 3.6, 10, 1, true), fx.material(0xff6a1e, 0.52)));
@@ -88,6 +89,7 @@ function frostPrison({ range }) {
 function stormLance({ range }) {
   const length = Math.min(Math.max(range, 8), 32);
   const fx = new Fx(1.0);
+  fx.impact = { t: 0.58, z: length, power: 0.8, radius: 3, color: 0x7fa0ff };
   const charge = fx.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.46, 1), fx.material(0xf4f8ff, 0.98)));
   const aura = fx.add(new THREE.Mesh(new THREE.SphereGeometry(0.9, 16, 12), fx.material(0x5d86ff, 0.3)));
   const bolts = Array.from({ length: 5 }, () => fx.add(new THREE.Line(new THREE.BufferGeometry(), fx.lineMaterial(0xbfd1ff, 0.9))));
